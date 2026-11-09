@@ -1,0 +1,36 @@
+{
+    # some examples from https://nix.dev/manual/nix/2.34/language/index.html we support
+    string = "hello world";
+    "true" = true;
+    "false" = false;
+    "null" = null;
+    integer = 123;
+    float = 3.141;
+    attrset = { x = 1; y = 2; };
+    nestedset = { foo.bar = 1; };
+    recursiveset = rec { x = "foo"; y = x + "bar"; };
+    listA = [ "foo" "bar" "baz" ];
+    listB = [ 1 2 3 ];
+    listC = [ { a = 1; b = 2; } [ "c" ] ];
+    strConcat = "foo" + "bar";
+    intAdd = 1 + 2;
+    equality = "foo" == "f" + "oo";
+    inqeuality = "foo" != "bar";
+    boolNegation = !true;
+    attrSelection = { x = 1; y = 2; }.x;
+    condExpr = if 1 + 1 == 2 then "yes!" else "no!";
+    varDef = let x = "foo"; y = "bar"; in x + y;
+    withExpr = with builtins; head [ 1 2 3 ];
+    fn = x: x + 1;
+    curriedFn = x: y: x + y;
+    fnCall = (x: x + 1) 100;
+    fnBoundCall = let inc = x: x + 1; in inc (inc (inc 100));
+    fnSetArg = { x, y }: x + y;
+    fnSetArgOptional = { x, y ? "bar" }: x + y;
+    fnSetArgBind = { x, y } @ args: x + y;
+    # and our custom stuff
+    abspath = '/etc';
+    relpath = './foo.png';
+    attrsetMerge = { x = 1; y = 2; } + { z = 3; };
+    fnSetArgIgnoreOther = { x, y, ... }: x + y;
+}
