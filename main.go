@@ -12,7 +12,7 @@ func main() {
     }
     lex := lexer.New(string(content))
     for {
-        token := lex.NextToken()
+        token := lex.Next()
         fmt.Println(token)
         if token.Type == lexer.ItemError || token.Type == lexer.ItemEOF {
             break

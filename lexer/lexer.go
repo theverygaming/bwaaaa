@@ -168,13 +168,26 @@ type Lexer struct {
 	input string
 	pos int // offset in string
 	width int // width of current rune
+	futureToken Item // next token
 }
 
 func New(input string) *Lexer {
-	return &Lexer{input: input, pos: 0}
+	lex := Lexer{input: input, pos: 0}
+	lex.Next() // to initialize futureToken so the first Peek or Next will return something
+	return &lex
 }
 
-func (lex *Lexer) NextToken() Item {
+func (lex *Lexer) Peek() Item {
+	return lex.futureToken
+}
+
+func (lex *Lexer) Next() Item {
+	current := lex.futureToken
+	lex.futureToken = lex.nextToken()
+	return current
+}
+
+func (lex *Lexer) nextToken() Item {
 	err := lex.skipCommentsAndWhitespace()
 	if err != nil {
 		if errors.Is(err, io.EOF) {
