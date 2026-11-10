@@ -15,6 +15,8 @@ const (
 	// operators
 	ItemPlus
 	ItemMinus
+	ItemMul
+	ItemDiv
 	ItemEquals
 	ItemExclamation
 	ItemQuestion
@@ -93,6 +95,10 @@ func (i Item) String() string {
 		return "+"
 	case ItemMinus:
 		return "-"
+	case ItemMul:
+		return "*"
+	case ItemDiv:
+		return "/"
 	case ItemEquals:
 		return "="
 	case ItemExclamation:
@@ -190,6 +196,10 @@ func (lex *Lexer) NextToken() Item {
 		return Item{Type: ItemPlus, Value: nil}
 	case '-':
 		return Item{Type: ItemMinus, Value: nil}
+	case '*':
+		return Item{Type: ItemMul, Value: nil}
+	case '/':
+		return Item{Type: ItemDiv, Value: nil}
 	case '=':
 		return Item{Type: ItemEquals, Value: nil}
 	case '!':
