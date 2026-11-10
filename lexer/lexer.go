@@ -18,7 +18,9 @@ const (
 	ItemMul
 	ItemDiv
 	ItemEquals
+	ItemEqualsEquals
 	ItemExclamation
+	ItemExclamationEquals
 	ItemQuestion
 	ItemDot
 	ItemComma
@@ -101,8 +103,12 @@ func (i Item) String() string {
 		return "/"
 	case ItemEquals:
 		return "="
+	case ItemEqualsEquals:
+		return "=="
 	case ItemExclamation:
 		return "!"
+	case ItemExclamationEquals:
+		return "!="
 	case ItemQuestion:
 		return "?"
 	case ItemDot:
@@ -213,10 +219,6 @@ func (lex *Lexer) nextToken() Item {
 		return Item{Type: ItemMul, Value: nil}
 	case '/':
 		return Item{Type: ItemDiv, Value: nil}
-	case '=':
-		return Item{Type: ItemEquals, Value: nil}
-	case '!':
-		return Item{Type: ItemExclamation, Value: nil}
 	case '?':
 		return Item{Type: ItemQuestion, Value: nil}
 	case '.':
@@ -247,6 +249,40 @@ func (lex *Lexer) nextToken() Item {
 		return Item{Type: ItemRightBracket, Value: nil}
 	}
 	lex.back()
+
+	// FIXME: this is cursed. The error handling is a damn mess everywhere :c
+	// =, ==, ! and !=
+	start := lex.pos
+	r1, err := lex.next()
+	if err != nil {
+		if errors.Is(err, io.EOF) {
+			return Item{Type: ItemEOF, Value: nil}
+		}
+		return Item{Type: ItemError, Value: err}
+	}
+	startr2 := lex.pos
+	r2, err := lex.next()
+	if err != nil {
+		if errors.Is(err, io.EOF) {
+			return Item{Type: ItemEOF, Value: nil}
+		}
+		return Item{Type: ItemError, Value: err}
+	}
+	if r1 == '=' {
+		if r2 == '=' {
+			return Item{Type: ItemEqualsEquals, Value: nil}
+		}
+		lex.pos = startr2
+		return Item{Type: ItemEquals, Value: nil}
+	}
+	if r1 == '!' {
+		if r2 == '=' {
+			return Item{Type: ItemExclamationEquals, Value: nil}
+		}
+		lex.pos = startr2
+		return Item{Type: ItemExclamation, Value: nil}
+	}
+	lex.pos = start
 
 	// prefix stuff
 	switch r {
