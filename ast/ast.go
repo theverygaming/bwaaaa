@@ -1,0 +1,86 @@
+package ast
+
+import "strconv"
+import "strings"
+
+type Expr interface {
+	Dump(indent int, indentIncrement int) string
+}
+
+type BinOpType int
+
+const (
+	BinOpAdd BinOpType = iota
+	BinOpSub
+	BinOpMul
+	BinOpDiv
+	BinOpLt
+	BinOpGt
+)
+
+type BinOp struct {
+	Op BinOpType
+	Lhs Expr
+	Rhs Expr
+}
+
+func indentString(indent int) string {
+	return strings.Repeat(" ", indent)
+}
+
+func (x BinOp) Dump(indent int, indentIncrement int) string {
+	var op string
+	switch x.Op {
+	case BinOpAdd:
+		op = "+"
+	case BinOpSub:
+		op = "-"
+	case BinOpMul:
+		op = "*"
+	case BinOpDiv:
+		op = "/"
+	case BinOpLt:
+		op = "<"
+	case BinOpGt:
+		op = ">"
+	}
+	ids := indentString(indent)
+	idn := indent + indentIncrement
+	return ids + "(BinOp " + op + "\n" +
+			x.Lhs.Dump(idn, indentIncrement) + "\n" + 
+			x.Rhs.Dump(idn, indentIncrement) + "\n" +
+			ids + ")"
+}
+
+// basic types
+type String struct {
+	Value string
+}
+
+func (x String) Dump(indent int, indentIncrement int) string {
+	return indentString(indent) + "(String \"" + x.Value + "\")"
+}
+
+type PathString struct {
+	Value string
+}
+
+func (x PathString) Dump(indent int, indentIncrement int) string {
+	return indentString(indent) + "(PathString '" + x.Value + "')"
+}
+
+type Integer struct {
+	Value int64
+}
+
+func (x Integer) Dump(indent int, indentIncrement int) string {
+	return indentString(indent) + "(Integer " + strconv.FormatInt(x.Value, 10) + ")"
+}
+
+type Float struct {
+	Value float64
+}
+
+func (x Float) Dump(indent int, indentIncrement int) string {
+	return indentString(indent) + "(Float " + strconv.FormatFloat(x.Value, 'f', -1, 64) + ")"
+}
