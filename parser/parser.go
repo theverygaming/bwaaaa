@@ -25,6 +25,8 @@ func parse(lex *lexer.Lexer, minBp int) (ast.Expr, error) {
 		lhs = ast.String{Value: token.AsString()}
 	case lexer.ItemPathString:
 		lhs = ast.PathString{Value: token.AsString()}
+	case lexer.ItemIdentifier:
+		lhs = ast.Identifier{Value: token.AsString()}
 	case lexer.ItemLeftParen:
 		var err error
 		lhs, err = parse(lex, 0)
@@ -48,6 +50,28 @@ func parse(lex *lexer.Lexer, minBp int) (ast.Expr, error) {
 			break
 		}
 
+		// Attribute Selection
+		if nextToken.Type == lexer.ItemDot {
+			lhsBp := 200
+			if lhsBp < minBp {
+				break
+			}
+
+			// consume dot
+			lex.Next()
+
+			var attr string
+			attrToken := lex.Next()
+			switch attrToken.Type {
+			case lexer.ItemIdentifier, lexer.ItemString:
+				attr = attrToken.AsString()
+			default:
+				return lhs, errors.New("Attribute Selection - expected Identifier or String, got: " + attrToken.String())
+			}
+			lhs = ast.AttrGet{Lhs: lhs, Attr: attr}
+			continue
+		}
+
 		// Infix
 		op, isInfix := infixOpConv(nextToken.Type)
 		if isInfix {
@@ -62,6 +86,19 @@ func parse(lex *lexer.Lexer, minBp int) (ast.Expr, error) {
 				return rhs, err
 			}
 			lhs = ast.BinOp{Op: op, Lhs: lhs, Rhs: rhs}
+			continue
+		}
+
+		if isValidFunctionArg(nextToken.Type) {
+			lhsBp, rhsBp := 100, 101
+			if lhsBp < minBp {
+				break
+			}
+			rhs, err := parse(lex, rhsBp)
+			if err != nil {
+				return rhs, err
+			}
+			lhs = ast.FnCall{Fn: lhs, Arg: rhs}
 			continue
 		}
 
@@ -88,7 +125,7 @@ func infixBindingPower(t ast.BinOpType) (int, int) {
 func infixOpConv(t lexer.ItemType) (ast.BinOpType, bool) {
 	var op ast.BinOpType
 	isInfix := true
-	switch (t) {
+	switch t {
 	case lexer.ItemPlus:
 		op = ast.BinOpAdd
 	case lexer.ItemMinus:
@@ -105,4 +142,26 @@ func infixOpConv(t lexer.ItemType) (ast.BinOpType, bool) {
 		isInfix = false
 	}
 	return op, isInfix
+}
+
+func isValidFunctionArg(t lexer.ItemType) bool {
+	switch t {
+	case lexer.ItemExclamation,
+		lexer.ItemMinus,
+		lexer.ItemLeftParen,
+		lexer.ItemLeftBrace,
+		lexer.ItemLeftBracket,
+		lexer.ItemInt,
+		lexer.ItemFloat,
+		lexer.ItemString,
+		lexer.ItemPathString,
+		lexer.ItemIdentifier,
+		lexer.ItemKwTrue,
+		lexer.ItemKwFalse,
+		lexer.ItemKwNull,
+		lexer.ItemKwRec:
+		return true
+	default:
+		return false
+	}
 }

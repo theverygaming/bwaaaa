@@ -52,6 +52,34 @@ func (x BinOp) Dump(indent int, indentIncrement int) string {
 			ids + ")"
 }
 
+type FnCall struct {
+	Fn Expr
+	Arg Expr
+}
+
+func (x FnCall) Dump(indent int, indentIncrement int) string {
+	ids := indentString(indent)
+	idn := indent + indentIncrement
+	return ids + "(FnCall\n" +
+			x.Fn.Dump(idn, indentIncrement) + "\n" + 
+			x.Arg.Dump(idn, indentIncrement) + "\n" +
+			ids + ")"
+}
+
+type AttrGet struct {
+	Lhs Expr
+	Attr string
+}
+
+func (x AttrGet) Dump(indent int, indentIncrement int) string {
+	ids := indentString(indent)
+	idn := indent + indentIncrement
+	return ids + "(AttrGet\n" +
+			x.Lhs.Dump(idn, indentIncrement) + "\n" + 
+			indentString(idn) + "(Attr " + x.Attr + ")\n" +
+			ids + ")"
+}
+
 // basic types
 type String struct {
 	Value string
@@ -67,6 +95,14 @@ type PathString struct {
 
 func (x PathString) Dump(indent int, indentIncrement int) string {
 	return indentString(indent) + "(PathString '" + x.Value + "')"
+}
+
+type Identifier struct {
+	Value string
+}
+
+func (x Identifier) Dump(indent int, indentIncrement int) string {
+	return indentString(indent) + "(Identifier '" + x.Value + "')"
 }
 
 type Integer struct {
