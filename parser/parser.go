@@ -6,7 +6,17 @@ import "bwaaaa/bwaaaa/ast"
 import "errors"
 
 func Parse(lex *lexer.Lexer) (ast.Expr, error) {
-	return parse(lex, 0)
+	expr, err := parse(lex, 0)
+	if err == nil {
+		token := lex.Next()
+		if token.Type == lexer.TokenError {
+			return expr, token.AsError()
+		}
+		if token.Type != lexer.TokenEOF {
+			return expr, errors.New("expected EOF got: " + token.String())
+		}
+	}
+	return expr, err
 }
 
 func parse(lex *lexer.Lexer, minBp int) (ast.Expr, error) {
