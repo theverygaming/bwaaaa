@@ -80,6 +80,22 @@ func (x AttrGet) Dump(indent int, indentIncrement int) string {
 			ids + ")"
 }
 
+type IfThenElse struct {
+	If Expr
+	Then Expr
+	Else Expr
+}
+
+func (x IfThenElse) Dump(indent int, indentIncrement int) string {
+	ids := indentString(indent)
+	idn := indent + indentIncrement
+	return ids + "(IfThenElse\n" +
+			x.If.Dump(idn, indentIncrement) + "\n" + 
+			x.Then.Dump(idn, indentIncrement) + "\n" +
+			x.Else.Dump(idn, indentIncrement) + "\n" +
+			ids + ")"
+}
+
 // basic types
 type String struct {
 	Value string

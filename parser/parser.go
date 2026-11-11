@@ -27,6 +27,29 @@ func parse(lex *lexer.Lexer, minBp int) (ast.Expr, error) {
 		lhs = ast.PathString{Value: token.AsString()}
 	case lexer.TokenIdentifier:
 		lhs = ast.Identifier{Value: token.AsString()}
+	// if..then..else
+	case lexer.TokenKwIf:
+		exprIf, err := parse(lex, 0)
+		if err != nil {
+			return exprIf, err
+		}
+		nextToken := lex.Next()
+		if nextToken.Type != lexer.TokenKwThen {
+			return lhs, errors.New("expected then got: " + nextToken.String())
+		}
+		exprThen, err := parse(lex, 0)
+		if err != nil {
+			return exprThen, err
+		}
+		nextToken = lex.Next()
+		if nextToken.Type != lexer.TokenKwElse {
+			return lhs, errors.New("expected else got: " + nextToken.String())
+		}
+		exprElse, err := parse(lex, 0)
+		if err != nil {
+			return exprElse, err
+		}
+		lhs = ast.IfThenElse{If: exprIf, Then: exprThen, Else: exprElse}
 	case lexer.TokenLeftParen:
 		var err error
 		lhs, err = parse(lex, 0)
