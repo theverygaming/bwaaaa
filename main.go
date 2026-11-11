@@ -20,7 +20,7 @@ func main() {
     for {
         token := lex.Next()
         fmt.Println(token)
-        if token.Type == lexer.ItemError || token.Type == lexer.ItemEOF {
+        if token.Type == lexer.TokenError || token.Type == lexer.TokenEOF {
             break
         }
     }

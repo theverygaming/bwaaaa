@@ -7,163 +7,163 @@ import "errors"
 import "io"
 import "log"
 
-type ItemType int
+type TokenType int
 
 const (
-	ItemError ItemType = iota
-	ItemEOF
+	TokenError TokenType = iota
+	TokenEOF
 	// operators
-	ItemPlus
-	ItemMinus
-	ItemMul
-	ItemDiv
-	ItemEquals
-	ItemEqualsEquals
-	ItemExclamation
-	ItemExclamationEquals
-	ItemQuestion
-	ItemDot
-	ItemComma
-	ItemLt
-	ItemGt
+	TokenPlus
+	TokenMinus
+	TokenMul
+	TokenDiv
+	TokenEquals
+	TokenEqualsEquals
+	TokenExclamation
+	TokenExclamationEquals
+	TokenQuestion
+	TokenDot
+	TokenComma
+	TokenLt
+	TokenGt
 	// symbols
-	ItemAt
-	ItemSemicolon
-	ItemColon
-	ItemLeftParen
-	ItemRightParen
-	ItemLeftBrace
-	ItemRightBrace
-	ItemLeftBracket
-	ItemRightBracket
+	TokenAt
+	TokenSemicolon
+	TokenColon
+	TokenLeftParen
+	TokenRightParen
+	TokenLeftBrace
+	TokenRightBrace
+	TokenLeftBracket
+	TokenRightBracket
 	// basic types
-	ItemInt
-	ItemFloat
-	ItemString
-	ItemPathString
+	TokenInt
+	TokenFloat
+	TokenString
+	TokenPathString
 	// Keywords/Identifiers
-	ItemIdentifier
-	ItemKwTrue
-	ItemKwFalse
-	ItemKwNull
-	ItemKwIf
-	ItemKwThen
-	ItemKwElse
-	ItemKwInherit
-	ItemKwWith
-	ItemKwRec
+	TokenIdentifier
+	TokenKwTrue
+	TokenKwFalse
+	TokenKwNull
+	TokenKwIf
+	TokenKwThen
+	TokenKwElse
+	TokenKwInherit
+	TokenKwWith
+	TokenKwRec
 )
 
-type Item struct {
-	Type ItemType
+type Token struct {
+	Type TokenType
 	Value any
 }
 
-func (i Item) AsString() string {
+func (i Token) AsString() string {
 	if s, ok := i.Value.(string); ok {
 		return s
 	}
 	return ""
 }
 
-func (i Item) AsInt() int64 {
+func (i Token) AsInt() int64 {
 	if s, ok := i.Value.(int64); ok {
 		return s
 	}
 	return 0
 }
 
-func (i Item) AsFloat() float64 {
+func (i Token) AsFloat() float64 {
 	if s, ok := i.Value.(float64); ok {
 		return s
 	}
 	return 0.0
 }
 
-func (i Item) AsError() error {
+func (i Token) AsError() error {
 	if s, ok := i.Value.(error); ok {
 		return s
 	}
 	return errors.New("???")
 }
 
-func (i Item) String() string {
+func (i Token) String() string {
 	switch i.Type {
-	case ItemError:
+	case TokenError:
 		return "lexer error: " + i.AsError().Error()
-	case ItemEOF:
+	case TokenEOF:
 		return "EOF!"
-	case ItemPlus:
+	case TokenPlus:
 		return "+"
-	case ItemMinus:
+	case TokenMinus:
 		return "-"
-	case ItemMul:
+	case TokenMul:
 		return "*"
-	case ItemDiv:
+	case TokenDiv:
 		return "/"
-	case ItemEquals:
+	case TokenEquals:
 		return "="
-	case ItemEqualsEquals:
+	case TokenEqualsEquals:
 		return "=="
-	case ItemExclamation:
+	case TokenExclamation:
 		return "!"
-	case ItemExclamationEquals:
+	case TokenExclamationEquals:
 		return "!="
-	case ItemQuestion:
+	case TokenQuestion:
 		return "?"
-	case ItemDot:
+	case TokenDot:
 		return "."
-	case ItemComma:
+	case TokenComma:
 		return ","
-	case ItemLt:
+	case TokenLt:
 		return "<"
-	case ItemGt:
+	case TokenGt:
 		return ">"
-	case ItemAt:
+	case TokenAt:
 		return "@"
-	case ItemSemicolon:
+	case TokenSemicolon:
 		return ";"
-	case ItemColon:
+	case TokenColon:
 		return ":"
-	case ItemLeftParen:
+	case TokenLeftParen:
 		return "("
-	case ItemRightParen:
+	case TokenRightParen:
 		return ")"
-	case ItemLeftBrace:
+	case TokenLeftBrace:
 		return "{"
-	case ItemRightBrace:
+	case TokenRightBrace:
 		return "}"
-	case ItemLeftBracket:
+	case TokenLeftBracket:
 		return "["
-	case ItemRightBracket:
+	case TokenRightBracket:
 		return "]"
-	case ItemInt:
+	case TokenInt:
 		return strconv.FormatInt(i.AsInt(), 10)
-	case ItemFloat:
+	case TokenFloat:
 		return strconv.FormatFloat(i.AsFloat(), 'f', -1, 64)
-	case ItemString:
+	case TokenString:
 		return "\"" + i.AsString() + "\""
-	case ItemPathString:
+	case TokenPathString:
 		return "'" + i.AsString() + "'"
-	case ItemIdentifier:
+	case TokenIdentifier:
 		return i.AsString()
-	case ItemKwTrue:
+	case TokenKwTrue:
 		return "true"
-	case ItemKwFalse:
+	case TokenKwFalse:
 		return "false"
-	case ItemKwNull:
+	case TokenKwNull:
 		return "null"
-	case ItemKwIf:
+	case TokenKwIf:
 		return "if"
-	case ItemKwThen:
+	case TokenKwThen:
 		return "then"
-	case ItemKwElse:
+	case TokenKwElse:
 		return "else"
-	case ItemKwInherit:
+	case TokenKwInherit:
 		return "inherit"
-	case ItemKwWith:
+	case TokenKwWith:
 		return "with"
-	case ItemKwRec:
+	case TokenKwRec:
 		return "rec"
 	default:
 		return "???"
@@ -174,7 +174,7 @@ type Lexer struct {
 	input string
 	pos int // offset in string
 	width int // width of current rune
-	futureToken Item // next token
+	futureToken Token // next token
 }
 
 func New(input string) *Lexer {
@@ -183,70 +183,70 @@ func New(input string) *Lexer {
 	return &lex
 }
 
-func (lex *Lexer) Peek() Item {
+func (lex *Lexer) Peek() Token {
 	return lex.futureToken
 }
 
-func (lex *Lexer) Next() Item {
+func (lex *Lexer) Next() Token {
 	current := lex.futureToken
 	lex.futureToken = lex.nextToken()
 	return current
 }
 
-func (lex *Lexer) nextToken() Item {
+func (lex *Lexer) nextToken() Token {
 	err := lex.skipCommentsAndWhitespace()
 	if err != nil {
 		if errors.Is(err, io.EOF) {
-			return Item{Type: ItemEOF, Value: nil}
+			return Token{Type: TokenEOF, Value: nil}
 		}
-		return Item{Type: ItemError, Value: err}
+		return Token{Type: TokenError, Value: err}
 	}
 	r, err := lex.next()
 	if err != nil {
 		if errors.Is(err, io.EOF) {
-			return Item{Type: ItemEOF, Value: nil}
+			return Token{Type: TokenEOF, Value: nil}
 		}
-		return Item{Type: ItemError, Value: err}
+		return Token{Type: TokenError, Value: err}
 	}
 
 	// single character stuff
 	switch r {
 	case '+':
-		return Item{Type: ItemPlus, Value: nil}
+		return Token{Type: TokenPlus, Value: nil}
 	case '-':
-		return Item{Type: ItemMinus, Value: nil}
+		return Token{Type: TokenMinus, Value: nil}
 	case '*':
-		return Item{Type: ItemMul, Value: nil}
+		return Token{Type: TokenMul, Value: nil}
 	case '/':
-		return Item{Type: ItemDiv, Value: nil}
+		return Token{Type: TokenDiv, Value: nil}
 	case '?':
-		return Item{Type: ItemQuestion, Value: nil}
+		return Token{Type: TokenQuestion, Value: nil}
 	case '.':
-		return Item{Type: ItemDot, Value: nil}
+		return Token{Type: TokenDot, Value: nil}
 	case ',':
-		return Item{Type: ItemComma, Value: nil}
+		return Token{Type: TokenComma, Value: nil}
 	case '@':
-		return Item{Type: ItemAt, Value: nil}
+		return Token{Type: TokenAt, Value: nil}
 	case ';':
-		return Item{Type: ItemSemicolon, Value: nil}
+		return Token{Type: TokenSemicolon, Value: nil}
 	case '<':
-		return Item{Type: ItemLt, Value: nil}
+		return Token{Type: TokenLt, Value: nil}
 	case '>':
-		return Item{Type: ItemGt, Value: nil}
+		return Token{Type: TokenGt, Value: nil}
 	case ':':
-		return Item{Type: ItemColon, Value: nil}
+		return Token{Type: TokenColon, Value: nil}
 	case '(':
-		return Item{Type: ItemLeftParen, Value: nil}
+		return Token{Type: TokenLeftParen, Value: nil}
 	case ')':
-		return Item{Type: ItemRightParen, Value: nil}
+		return Token{Type: TokenRightParen, Value: nil}
 	case '{':
-		return Item{Type: ItemLeftBrace, Value: nil}
+		return Token{Type: TokenLeftBrace, Value: nil}
 	case '}':
-		return Item{Type: ItemRightBrace, Value: nil}
+		return Token{Type: TokenRightBrace, Value: nil}
 	case '[':
-		return Item{Type: ItemLeftBracket, Value: nil}
+		return Token{Type: TokenLeftBracket, Value: nil}
 	case ']':
-		return Item{Type: ItemRightBracket, Value: nil}
+		return Token{Type: TokenRightBracket, Value: nil}
 	}
 	lex.back()
 
@@ -256,31 +256,31 @@ func (lex *Lexer) nextToken() Item {
 	r1, err := lex.next()
 	if err != nil {
 		if errors.Is(err, io.EOF) {
-			return Item{Type: ItemEOF, Value: nil}
+			return Token{Type: TokenEOF, Value: nil}
 		}
-		return Item{Type: ItemError, Value: err}
+		return Token{Type: TokenError, Value: err}
 	}
 	startr2 := lex.pos
 	r2, err := lex.next()
 	if err != nil {
 		if errors.Is(err, io.EOF) {
-			return Item{Type: ItemEOF, Value: nil}
+			return Token{Type: TokenEOF, Value: nil}
 		}
-		return Item{Type: ItemError, Value: err}
+		return Token{Type: TokenError, Value: err}
 	}
 	if r1 == '=' {
 		if r2 == '=' {
-			return Item{Type: ItemEqualsEquals, Value: nil}
+			return Token{Type: TokenEqualsEquals, Value: nil}
 		}
 		lex.pos = startr2
-		return Item{Type: ItemEquals, Value: nil}
+		return Token{Type: TokenEquals, Value: nil}
 	}
 	if r1 == '!' {
 		if r2 == '=' {
-			return Item{Type: ItemExclamationEquals, Value: nil}
+			return Token{Type: TokenExclamationEquals, Value: nil}
 		}
 		lex.pos = startr2
-		return Item{Type: ItemExclamation, Value: nil}
+		return Token{Type: TokenExclamation, Value: nil}
 	}
 	lex.pos = start
 
@@ -298,10 +298,10 @@ func (lex *Lexer) nextToken() Item {
 		return lex.scanIdentifier()
 	}
 
-	return Item{Type: ItemError, Value: errors.New("unexpected token: " + string(r))}
+	return Token{Type: TokenError, Value: errors.New("unexpected token: " + string(r))}
 }
 
-func (lex *Lexer) scanNumber() Item {
+func (lex *Lexer) scanNumber() Token {
 	start := lex.pos
 	isFloat := false
 	isHex := false
@@ -314,16 +314,16 @@ func (lex *Lexer) scanNumber() Item {
 				gotEOF = true
 				break
 			}
-			return Item{Type: ItemError, Value: err}
+			return Token{Type: TokenError, Value: err}
 		}
 		// float
 		if r == '.' {
 			// extra dot or hex? Impossible.
 			if isFloat {
-				return Item{Type: ItemError, Value: errors.New("more than one dot float")}
+				return Token{Type: TokenError, Value: errors.New("more than one dot float")}
 			}
 			if isHex {
-				return Item{Type: ItemError, Value: errors.New("hex & float number???")}
+				return Token{Type: TokenError, Value: errors.New("hex & float number???")}
 			}
 			isFloat = true
 			continue
@@ -332,7 +332,7 @@ func (lex *Lexer) scanNumber() Item {
 		if r == 'x' {
 			// needs to start with 0x for hex
 			if !(lex.pos - start == 2 && lex.input[start] == '0') {
-				return Item{Type: ItemError, Value: errors.New("invalid hex number")}
+				return Token{Type: TokenError, Value: errors.New("invalid hex number")}
 			}
 			isHex = true
 			continue
@@ -348,9 +348,9 @@ func (lex *Lexer) scanNumber() Item {
 	if isFloat {
 		val, err := strconv.ParseFloat(lex.input[start:start+n], 64)
 		if err != nil {
-			return Item{Type: ItemError, Value: err}
+			return Token{Type: TokenError, Value: err}
 		}
-		return Item{Type: ItemFloat, Value: val}
+		return Token{Type: TokenFloat, Value: val}
 	} else {
 		base := 10
 		offset := 0
@@ -360,13 +360,13 @@ func (lex *Lexer) scanNumber() Item {
 		}
 		val, err := strconv.ParseInt(lex.input[start+offset:start+n], base, 64)
 		if err != nil {
-			return Item{Type: ItemError, Value: err}
+			return Token{Type: TokenError, Value: err}
 		}
-		return Item{Type: ItemInt, Value: val}
+		return Token{Type: TokenInt, Value: val}
 	}
 }
 
-func (lex *Lexer) scanIdentifier() Item {
+func (lex *Lexer) scanIdentifier() Token {
 	start := lex.pos
 	gotEOF := false
 	for {
@@ -377,7 +377,7 @@ func (lex *Lexer) scanIdentifier() Item {
 				gotEOF = true
 				break
 			}
-			return Item{Type: ItemError, Value: err}
+			return Token{Type: TokenError, Value: err}
 		}
 
 		if !isIdentifierRune(r) {
@@ -392,29 +392,29 @@ func (lex *Lexer) scanIdentifier() Item {
 
 	switch ident {
 	case "true":
-		return Item{Type: ItemKwTrue, Value: nil}
+		return Token{Type: TokenKwTrue, Value: nil}
 	case "false":
-		return Item{Type: ItemKwFalse, Value: nil}
+		return Token{Type: TokenKwFalse, Value: nil}
 	case "null":
-		return Item{Type: ItemKwNull, Value: nil}
+		return Token{Type: TokenKwNull, Value: nil}
 	case "if":
-		return Item{Type: ItemKwIf, Value: nil}
+		return Token{Type: TokenKwIf, Value: nil}
 	case "then":
-		return Item{Type: ItemKwThen, Value: nil}
+		return Token{Type: TokenKwThen, Value: nil}
 	case "else":
-		return Item{Type: ItemKwElse, Value: nil}
+		return Token{Type: TokenKwElse, Value: nil}
 	case "inherit":
-		return Item{Type: ItemKwInherit, Value: nil}
+		return Token{Type: TokenKwInherit, Value: nil}
 	case "with":
-		return Item{Type: ItemKwWith, Value: nil}
+		return Token{Type: TokenKwWith, Value: nil}
 	case "rec":
-		return Item{Type: ItemKwRec, Value: nil}
+		return Token{Type: TokenKwRec, Value: nil}
 	}
 
-	return Item{Type: ItemIdentifier, Value: ident}
+	return Token{Type: TokenIdentifier, Value: ident}
 }
 
-func (lex *Lexer) scanString(isPath bool) Item {
+func (lex *Lexer) scanString(isPath bool) Token {
 	quotechar := '"'
 	if isPath {
 		quotechar = '\''
@@ -427,9 +427,9 @@ func (lex *Lexer) scanString(isPath bool) Item {
 		r, err := lex.next()
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				return Item{Type: ItemEOF, Value: nil}
+				return Token{Type: TokenEOF, Value: nil}
 			}
-			return Item{Type: ItemError, Value: err}
+			return Token{Type: TokenError, Value: err}
 		}
 
 		if escaped {
@@ -466,9 +466,9 @@ func (lex *Lexer) scanString(isPath bool) Item {
 	}
 
 	if isPath {
-		return Item{Type: ItemPathString, Value: result}
+		return Token{Type: TokenPathString, Value: result}
 	} else {
-		return Item{Type: ItemString, Value: result}
+		return Token{Type: TokenString, Value: result}
 	}
 }
 

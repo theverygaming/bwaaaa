@@ -12,29 +12,29 @@ func Parse(lex *lexer.Lexer) (ast.Expr, error) {
 func parse(lex *lexer.Lexer, minBp int) (ast.Expr, error) {
 	var lhs ast.Expr
 	token := lex.Next()
-	if token.Type == lexer.ItemError {
+	if token.Type == lexer.TokenError {
 		return lhs, token.AsError()
 	}
 
 	switch token.Type {
-	case lexer.ItemInt:
+	case lexer.TokenInt:
 		lhs = ast.Integer{Value: token.AsInt()}
-	case lexer.ItemFloat:
+	case lexer.TokenFloat:
 		lhs = ast.Float{Value: token.AsFloat()}
-	case lexer.ItemString:
+	case lexer.TokenString:
 		lhs = ast.String{Value: token.AsString()}
-	case lexer.ItemPathString:
+	case lexer.TokenPathString:
 		lhs = ast.PathString{Value: token.AsString()}
-	case lexer.ItemIdentifier:
+	case lexer.TokenIdentifier:
 		lhs = ast.Identifier{Value: token.AsString()}
-	case lexer.ItemLeftParen:
+	case lexer.TokenLeftParen:
 		var err error
 		lhs, err = parse(lex, 0)
 		if err != nil {
 			return lhs, err
 		}
 		nextToken := lex.Next()
-		if nextToken.Type != lexer.ItemRightParen {
+		if nextToken.Type != lexer.TokenRightParen {
 			return lhs, errors.New("expected ) got: " + nextToken.String())
 		}
 	default:
@@ -43,15 +43,15 @@ func parse(lex *lexer.Lexer, minBp int) (ast.Expr, error) {
 
 	for {
 		nextToken := lex.Peek()
-		if nextToken.Type == lexer.ItemError {
+		if nextToken.Type == lexer.TokenError {
 			return lhs, nextToken.AsError()
 		}
-		if nextToken.Type == lexer.ItemEOF {
+		if nextToken.Type == lexer.TokenEOF {
 			break
 		}
 
 		// Attribute Selection
-		if nextToken.Type == lexer.ItemDot {
+		if nextToken.Type == lexer.TokenDot {
 			lhsBp := 200
 			if lhsBp < minBp {
 				break
@@ -63,7 +63,7 @@ func parse(lex *lexer.Lexer, minBp int) (ast.Expr, error) {
 			var attr string
 			attrToken := lex.Next()
 			switch attrToken.Type {
-			case lexer.ItemIdentifier, lexer.ItemString:
+			case lexer.TokenIdentifier, lexer.TokenString:
 				attr = attrToken.AsString()
 			default:
 				return lhs, errors.New("Attribute Selection - expected Identifier or String, got: " + attrToken.String())
@@ -122,21 +122,21 @@ func infixBindingPower(t ast.BinOpType) (int, int) {
 	}
 }
 
-func infixOpConv(t lexer.ItemType) (ast.BinOpType, bool) {
+func infixOpConv(t lexer.TokenType) (ast.BinOpType, bool) {
 	var op ast.BinOpType
 	isInfix := true
 	switch t {
-	case lexer.ItemPlus:
+	case lexer.TokenPlus:
 		op = ast.BinOpAdd
-	case lexer.ItemMinus:
+	case lexer.TokenMinus:
 		op = ast.BinOpSub
-	case lexer.ItemMul:
+	case lexer.TokenMul:
 		op = ast.BinOpMul
-	case lexer.ItemDiv:
+	case lexer.TokenDiv:
 		op = ast.BinOpDiv
-	case lexer.ItemLt:
+	case lexer.TokenLt:
 		op = ast.BinOpLt
-	case lexer.ItemGt:
+	case lexer.TokenGt:
 		op = ast.BinOpGt
 	default:
 		isInfix = false
@@ -144,22 +144,22 @@ func infixOpConv(t lexer.ItemType) (ast.BinOpType, bool) {
 	return op, isInfix
 }
 
-func isValidFunctionArg(t lexer.ItemType) bool {
+func isValidFunctionArg(t lexer.TokenType) bool {
 	switch t {
-	case lexer.ItemExclamation,
-		lexer.ItemMinus,
-		lexer.ItemLeftParen,
-		lexer.ItemLeftBrace,
-		lexer.ItemLeftBracket,
-		lexer.ItemInt,
-		lexer.ItemFloat,
-		lexer.ItemString,
-		lexer.ItemPathString,
-		lexer.ItemIdentifier,
-		lexer.ItemKwTrue,
-		lexer.ItemKwFalse,
-		lexer.ItemKwNull,
-		lexer.ItemKwRec:
+	case lexer.TokenExclamation,
+		lexer.TokenMinus,
+		lexer.TokenLeftParen,
+		lexer.TokenLeftBrace,
+		lexer.TokenLeftBracket,
+		lexer.TokenInt,
+		lexer.TokenFloat,
+		lexer.TokenString,
+		lexer.TokenPathString,
+		lexer.TokenIdentifier,
+		lexer.TokenKwTrue,
+		lexer.TokenKwFalse,
+		lexer.TokenKwNull,
+		lexer.TokenKwRec:
 		return true
 	default:
 		return false
