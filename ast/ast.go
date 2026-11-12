@@ -96,6 +96,31 @@ func (x IfThenElse) Dump(indent int, indentIncrement int) string {
 			ids + ")"
 }
 
+type LetInVar struct {
+	Name string
+	Value Expr
+}
+
+type LetIn struct {
+	Vars []LetInVar
+	In Expr
+}
+
+func (x LetIn) Dump(indent int, indentIncrement int) string {
+	ids := indentString(indent)
+	idn := indent + indentIncrement
+	vars := ""
+	for _, v := range x.Vars {
+		vars += indentString(idn) + "(Var " + v.Name + "\n" +
+				v.Value.Dump(idn + indentIncrement, indentIncrement) + "\n" +
+				indentString(idn) + ")\n"
+	}
+	return ids + "(LetIn\n" +
+			vars +
+			x.In.Dump(idn, indentIncrement) + "\n" +
+			ids + ")"
+}
+
 // basic types
 type String struct {
 	Value string

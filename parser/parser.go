@@ -60,6 +60,37 @@ func parse(lex *lexer.Lexer, minBp int) (ast.Expr, error) {
 			return exprElse, err
 		}
 		lhs = ast.IfThenElse{If: exprIf, Then: exprThen, Else: exprElse}
+	// let..in
+	case lexer.TokenKwLet:
+		vars := []ast.LetInVar{}
+		for {
+			nextToken := lex.Next()
+			if nextToken.Type == lexer.TokenKwIn {
+				break
+			}
+			if nextToken.Type != lexer.TokenIdentifier {
+				return lhs, errors.New("expected identifier got: " + nextToken.String())
+			}
+			varName := nextToken.AsString()
+			nextToken = lex.Next()
+			if nextToken.Type != lexer.TokenEquals {
+				return lhs, errors.New("expected = got: " + nextToken.String())
+			}
+			exprValue, err := parse(lex, 0)
+			if err != nil {
+				return exprValue, err
+			}
+			nextToken = lex.Next()
+			if nextToken.Type != lexer.TokenSemicolon {
+				return lhs, errors.New("expected ; got: " + nextToken.String())
+			}
+			vars = append(vars, ast.LetInVar{Name: varName, Value: exprValue})
+		}
+		exprIn, err := parse(lex, 0)
+		if err != nil {
+			return exprIn, err
+		}
+		lhs = ast.LetIn{Vars: vars, In: exprIn}
 	case lexer.TokenLeftParen:
 		var err error
 		lhs, err = parse(lex, 0)
