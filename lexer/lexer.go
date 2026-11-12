@@ -52,6 +52,8 @@ const (
 	TokenKwInherit
 	TokenKwWith
 	TokenKwRec
+	TokenKwLet
+	TokenKwIn
 )
 
 type Token struct {
@@ -165,6 +167,10 @@ func (i Token) String() string {
 		return "with"
 	case TokenKwRec:
 		return "rec"
+	case TokenKwLet:
+		return "let"
+	case TokenKwIn:
+		return "in"
 	default:
 		return "???"
 	}
@@ -409,6 +415,10 @@ func (lex *Lexer) scanIdentifier() Token {
 		return Token{Type: TokenKwWith, Value: nil}
 	case "rec":
 		return Token{Type: TokenKwRec, Value: nil}
+	case "let":
+		return Token{Type: TokenKwLet, Value: nil}
+	case "in":
+		return Token{Type: TokenKwIn, Value: nil}
 	}
 
 	return Token{Type: TokenIdentifier, Value: ident}
