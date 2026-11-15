@@ -121,6 +121,20 @@ func (x LetIn) Dump(indent int, indentIncrement int) string {
 			ids + ")"
 }
 
+type WithIn struct {
+	With Expr
+	In Expr
+}
+
+func (x WithIn) Dump(indent int, indentIncrement int) string {
+	ids := indentString(indent)
+	idn := indent + indentIncrement
+	return ids + "(WithIn\n" +
+			x.With.Dump(idn, indentIncrement) + "\n" + 
+			x.In.Dump(idn, indentIncrement) + "\n" +
+			ids + ")"
+}
+
 // basic types
 type String struct {
 	Value string

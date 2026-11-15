@@ -91,6 +91,20 @@ func parse(lex *lexer.Lexer, minBp int) (ast.Expr, error) {
 			return exprIn, err
 		}
 		lhs = ast.LetIn{Vars: vars, In: exprIn}
+	case lexer.TokenKwWith:
+		exprWith, err := parse(lex, 0)
+		if err != nil {
+			return exprWith, err
+		}
+		nextToken := lex.Next()
+		if nextToken.Type != lexer.TokenSemicolon {
+			return lhs, errors.New("expected ; got: " + nextToken.String())
+		}
+		exprIn, err := parse(lex, 0)
+		if err != nil {
+			return exprIn, err
+		}
+		lhs = ast.WithIn{With: exprWith, In: exprIn}
 	case lexer.TokenLeftParen:
 		var err error
 		lhs, err = parse(lex, 0)
