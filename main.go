@@ -7,7 +7,7 @@ import "bwaaaa/bwaaaa/lexer"
 import "bwaaaa/bwaaaa/parser"
 
 func main() {
-    content, err := os.ReadFile("samples/lang.bwaaaa");
+    content, err := os.ReadFile("samples/lang.bwaaaa")
     if err != nil {
         log.Fatal(err)
     }
