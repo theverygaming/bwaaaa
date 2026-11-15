@@ -248,10 +248,12 @@ func parse(lex *lexer.Lexer, minBp int) (ast.Expr, error) {
 func infixBindingPower(t ast.BinOpType) (int, int) {
 	switch t {
 	case ast.BinOpAdd, ast.BinOpSub:
-		return 3, 4
+		return 6, 6
 	case ast.BinOpMul, ast.BinOpDiv:
-		return 5, 6
+		return 7, 8
 	case ast.BinOpLt, ast.BinOpGt:
+		return 3, 4
+	case ast.BinOpEq, ast.BinOpNeq:
 		return 1, 2
 	default:
 		return 0, 0
@@ -274,6 +276,10 @@ func infixOpConv(t lexer.TokenType) (ast.BinOpType, bool) {
 		op = ast.BinOpLt
 	case lexer.TokenGt:
 		op = ast.BinOpGt
+	case lexer.TokenEqualsEquals:
+		op = ast.BinOpEq
+	case lexer.TokenExclamationEquals:
+		op = ast.BinOpNeq
 	default:
 		isInfix = false
 	}

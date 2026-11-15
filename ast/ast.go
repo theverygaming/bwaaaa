@@ -16,6 +16,8 @@ const (
 	BinOpDiv
 	BinOpLt
 	BinOpGt
+	BinOpEq
+	BinOpNeq
 )
 
 type BinOp struct {
@@ -43,6 +45,10 @@ func (x BinOp) Dump(indent int, indentIncrement int) string {
 		op = "<"
 	case BinOpGt:
 		op = ">"
+	case BinOpEq:
+		op = "=="
+	case BinOpNeq:
+		op = "!="
 	}
 	ids := indentString(indent)
 	idn := indent + indentIncrement
