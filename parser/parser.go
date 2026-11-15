@@ -137,7 +137,7 @@ func parse(lex *lexer.Lexer, minBp int) (ast.Expr, error) {
 				lex.Next()
 				break
 			}
-			exprName, err := parse(lex, 201) // minBp > the binding power for attribute selection to prevent stuff like a.b from being valid (instead do (a.b))
+			exprName, err := parse(lex, 0)
 			if err != nil {
 				return exprName, err
 			}
