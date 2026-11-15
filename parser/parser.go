@@ -27,6 +27,12 @@ func parse(lex *lexer.Lexer, minBp int) (ast.Expr, error) {
 	}
 
 	switch token.Type {
+	case lexer.TokenKwTrue:
+		lhs = ast.Boolean{Value: true}
+	case lexer.TokenKwFalse:
+		lhs = ast.Boolean{Value: false}
+	case lexer.TokenKwNull:
+		lhs = ast.Null{}
 	case lexer.TokenInt:
 		lhs = ast.Integer{Value: token.AsInt()}
 	case lexer.TokenFloat:

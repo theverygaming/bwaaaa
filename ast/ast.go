@@ -220,3 +220,17 @@ type Float struct {
 func (x Float) Dump(indent int, indentIncrement int) string {
 	return indentString(indent) + "(Float " + strconv.FormatFloat(x.Value, 'f', -1, 64) + ")"
 }
+
+type Boolean struct {
+	Value bool
+}
+
+func (x Boolean) Dump(indent int, indentIncrement int) string {
+	return indentString(indent) + "(Boolean " + strconv.FormatBool(x.Value)  + ")"
+}
+
+type Null struct {}
+
+func (x Null) Dump(indent int, indentIncrement int) string {
+	return indentString(indent) + "(Null)"
+}
