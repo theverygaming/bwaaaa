@@ -151,6 +151,35 @@ func (x List) Dump(indent int, indentIncrement int) string {
 			ids + ")"
 }
 
+type AttrsetItem struct {
+	Name Expr
+	Value Expr
+}
+
+type Attrset struct {
+	Items []AttrsetItem
+	Recursive bool
+}
+
+func (x Attrset) Dump(indent int, indentIncrement int) string {
+	ids := indentString(indent)
+	idn := indent + indentIncrement
+	items := ""
+	for _, v := range x.Items {
+		items += indentString(idn) + "(Attr\n" +
+				v.Name.Dump(idn + indentIncrement, indentIncrement) + "\n" +
+				v.Value.Dump(idn + indentIncrement, indentIncrement) + "\n" +
+				indentString(idn) + ")\n"
+	}
+	note := ""
+	if x.Recursive {
+		note = " (recursive)"
+	}
+	return ids + "(Attrset" + note + "\n" +
+			items +
+			ids + ")"
+}
+
 // basic types
 type String struct {
 	Value string

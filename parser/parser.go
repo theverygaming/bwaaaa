@@ -120,6 +120,42 @@ func parse(lex *lexer.Lexer, minBp int) (ast.Expr, error) {
 			items = append(items, expr)
 		}
 		lhs = ast.List{Items: items}
+	case lexer.TokenKwRec:
+		fallthrough
+	case lexer.TokenLeftBrace:
+		isRec := token.Type == lexer.TokenKwRec
+		if isRec {
+			nextToken := lex.Next()
+			if nextToken.Type != lexer.TokenLeftBrace {
+				return lhs, errors.New("expected { got: " + nextToken.String())
+			}
+		}
+		items := []ast.AttrsetItem{}
+		for {
+			nextToken := lex.Peek()
+			if nextToken.Type == lexer.TokenRightBrace {
+				lex.Next()
+				break
+			}
+			exprName, err := parse(lex, 201) // minBp > the binding power for attribute selection to prevent stuff like a.b from being valid (instead do (a.b))
+			if err != nil {
+				return exprName, err
+			}
+			nextToken = lex.Next()
+			if nextToken.Type != lexer.TokenEquals {
+				return lhs, errors.New("expected = got: " + nextToken.String())
+			}
+			exprValue, err := parse(lex, 0)
+			if err != nil {
+				return exprValue, err
+			}
+			nextToken = lex.Next()
+			if nextToken.Type != lexer.TokenSemicolon {
+				return lhs, errors.New("expected ; got: " + nextToken.String())
+			}
+			items = append(items, ast.AttrsetItem{Name: exprName, Value: exprValue})
+		}
+		lhs = ast.Attrset{Items: items, Recursive: isRec}
 	case lexer.TokenLeftParen:
 		var err error
 		lhs, err = parse(lex, 0)
