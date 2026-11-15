@@ -135,6 +135,22 @@ func (x WithIn) Dump(indent int, indentIncrement int) string {
 			ids + ")"
 }
 
+type List struct {
+	Items []Expr
+}
+
+func (x List) Dump(indent int, indentIncrement int) string {
+	ids := indentString(indent)
+	idn := indent + indentIncrement
+	items := ""
+	for _, v := range x.Items {
+		items += v.Dump(idn, indentIncrement) + "\n"
+	}
+	return ids + "(List\n" +
+			items +
+			ids + ")"
+}
+
 // basic types
 type String struct {
 	Value string

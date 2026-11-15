@@ -105,6 +105,21 @@ func parse(lex *lexer.Lexer, minBp int) (ast.Expr, error) {
 			return exprIn, err
 		}
 		lhs = ast.WithIn{With: exprWith, In: exprIn}
+	case lexer.TokenLeftBracket:
+		items := []ast.Expr{}
+		for {
+			nextToken := lex.Peek()
+			if nextToken.Type == lexer.TokenRightBracket {
+				lex.Next()
+				break
+			}
+			expr, err := parse(lex, 201) // minBp > the binding power for attribute selection to prevent stuff like [a.b c.d] from being valid (instead do [(a.b) (c.d)])
+			if err != nil {
+				return expr, err
+			}
+			items = append(items, expr)
+		}
+		lhs = ast.List{Items: items}
 	case lexer.TokenLeftParen:
 		var err error
 		lhs, err = parse(lex, 0)
@@ -115,8 +130,9 @@ func parse(lex *lexer.Lexer, minBp int) (ast.Expr, error) {
 		if nextToken.Type != lexer.TokenRightParen {
 			return lhs, errors.New("expected ) got: " + nextToken.String())
 		}
+	// TODO: prefix operators (-, !)
 	default:
-		return lhs, errors.New("unknown token: " + token.String())
+		return lhs, errors.New("unexpected token: " + token.String())
 	}
 
 	for {
