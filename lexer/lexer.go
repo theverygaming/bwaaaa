@@ -23,6 +23,7 @@ const (
 	TokenExclamationEquals
 	TokenQuestion
 	TokenDot
+	TokenTripleDot
 	TokenComma
 	TokenLt
 	TokenGt
@@ -224,8 +225,6 @@ func (lex *Lexer) nextToken() Token {
 		return Token{Type: TokenDiv, Value: nil}
 	case '?':
 		return Token{Type: TokenQuestion, Value: nil}
-	case '.':
-		return Token{Type: TokenDot, Value: nil}
 	case ',':
 		return Token{Type: TokenComma, Value: nil}
 	case '@':
@@ -254,7 +253,7 @@ func (lex *Lexer) nextToken() Token {
 	lex.back()
 
 	// FIXME: this is cursed. The error handling is a damn mess everywhere :c
-	// =, ==, ! and !=
+	// =, ==, !, !=, . and ...
 	start := lex.pos
 	r1, err := lex.next()
 	if err != nil {
@@ -265,6 +264,13 @@ func (lex *Lexer) nextToken() Token {
 	}
 	startr2 := lex.pos
 	r2, err := lex.next()
+	if err != nil {
+		if errors.Is(err, io.EOF) {
+			return Token{Type: TokenEOF, Value: nil}
+		}
+		return Token{Type: TokenError, Value: err}
+	}
+	r3, err := lex.next()
 	if err != nil {
 		if errors.Is(err, io.EOF) {
 			return Token{Type: TokenEOF, Value: nil}
@@ -284,6 +290,13 @@ func (lex *Lexer) nextToken() Token {
 		}
 		lex.pos = startr2
 		return Token{Type: TokenExclamation, Value: nil}
+	}
+	if r1 == '.' {
+		if r2 == '.' && r3 == '.' {
+			return Token{Type: TokenTripleDot, Value: nil}
+		}
+		lex.pos = startr2
+		return Token{Type: TokenDot, Value: nil}
 	}
 	lex.pos = start
 
