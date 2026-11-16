@@ -40,7 +40,6 @@ const (
 	TokenInt
 	TokenFloat
 	TokenString
-	TokenPathString
 	// Keywords/Identifiers
 	TokenIdentifier
 	TokenKwTrue
@@ -145,8 +144,6 @@ func (i Token) String() string {
 		return strconv.FormatFloat(i.AsFloat(), 'f', -1, 64)
 	case TokenString:
 		return "\"" + i.AsString() + "\""
-	case TokenPathString:
-		return "'" + i.AsString() + "'"
 	case TokenIdentifier:
 		return i.AsString()
 	case TokenKwTrue:
@@ -293,9 +290,7 @@ func (lex *Lexer) nextToken() Token {
 	// prefix stuff
 	switch r {
 	case '"':
-		return lex.scanString(false)
-	case '\'':
-		return lex.scanString(true)
+		return lex.scanString()
 	}
 
 	if unicode.IsDigit(r) {
@@ -424,11 +419,8 @@ func (lex *Lexer) scanIdentifier() Token {
 	return Token{Type: TokenIdentifier, Value: ident}
 }
 
-func (lex *Lexer) scanString(isPath bool) Token {
+func (lex *Lexer) scanString() Token {
 	quotechar := '"'
-	if isPath {
-		quotechar = '\''
-	}
 	start := lex.pos
 	result := ""
 	escaped := false
@@ -475,11 +467,7 @@ func (lex *Lexer) scanString(isPath bool) Token {
 		result += string(r)
 	}
 
-	if isPath {
-		return Token{Type: TokenPathString, Value: result}
-	} else {
-		return Token{Type: TokenString, Value: result}
-	}
+	return Token{Type: TokenString, Value: result}
 }
 
 func (lex *Lexer) skipCommentsAndWhitespace() error {

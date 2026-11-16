@@ -30,7 +30,5 @@
     fnSetArgIgnoreOther = { x, y, ... }: x + y;
     fnSetArgBind = { x, y } @ args: x + y;
     # and our custom stuff
-    abspath = '/etc';
-    relpath = './foo.png';
     attrsetMerge = { x = 1; y = 2; } + { z = 3; };
 }

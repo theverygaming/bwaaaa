@@ -39,8 +39,6 @@ func parse(lex *lexer.Lexer, minBp int) (ast.Expr, error) {
 		lhs = ast.Float{Value: token.AsFloat()}
 	case lexer.TokenString:
 		lhs = ast.String{Value: token.AsString()}
-	case lexer.TokenPathString:
-		lhs = ast.PathString{Value: token.AsString()}
 	case lexer.TokenIdentifier:
 		lhs = ast.Identifier{Value: token.AsString()}
 	case lexer.TokenExclamation:
@@ -326,7 +324,6 @@ func isValidFunctionArg(t lexer.TokenType) bool {
 		lexer.TokenInt,
 		lexer.TokenFloat,
 		lexer.TokenString,
-		lexer.TokenPathString,
 		lexer.TokenIdentifier,
 		lexer.TokenKwTrue,
 		lexer.TokenKwFalse,

@@ -236,14 +236,6 @@ func (x String) Dump(indent int, indentIncrement int) string {
 	return indentString(indent) + "(String \"" + x.Value + "\")"
 }
 
-type PathString struct {
-	Value string
-}
-
-func (x PathString) Dump(indent int, indentIncrement int) string {
-	return indentString(indent) + "(PathString '" + x.Value + "')"
-}
-
 type Identifier struct {
 	Value string
 }
