@@ -227,6 +227,44 @@ func (x Lambda) Dump(indent int, indentIncrement int) string {
 			ids + ")"
 }
 
+type AttrsetLambdaArgItem struct {
+	Name string
+	HasDefault bool
+	Default Expr
+}
+
+type AttrsetLambdaArg struct {
+	Items []AttrsetLambdaArgItem
+	IgnoreExtraAttrs bool
+	HasBind bool
+	Bind string
+}
+
+func (x AttrsetLambdaArg) Dump(indent int, indentIncrement int) string {
+	ids := indentString(indent)
+	idn := indent + indentIncrement
+	items := ""
+	for _, v := range x.Items {
+		if v.HasDefault {
+			items += indentString(idn) + "(AttrsetLambdaArgItem (with default) " + v.Name + "\n" +
+				v.Default.Dump(idn + indentIncrement, indentIncrement) + "\n" +
+				indentString(idn) + ")\n"
+		} else {
+			items += indentString(idn) + "(AttrsetLambdaArgItem " + v.Name + ")\n"
+		}
+	}
+	note := ""
+	if x.IgnoreExtraAttrs {
+		note = " (ignores extra attributes)"
+	}
+	if x.HasBind {
+		note = " (binds to " + x.Bind + ")"
+	}
+	return ids + "(AttrsetLambdaArg" + note + "\n" +
+			items +
+			ids + ")"
+}
+
 // basic types
 type String struct {
 	Value string

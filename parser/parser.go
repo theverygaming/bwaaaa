@@ -139,39 +139,157 @@ func parse(lex *lexer.Lexer, minBp int) (ast.Expr, error) {
 	case lexer.TokenKwRec:
 		fallthrough
 	case lexer.TokenLeftBrace:
+		// HACK: this whole thing is peak hack :3c fuck clean code we ball this shit is unreadable!! Good luck fixing it future me :3
+		mode := 0 // 0 = to be detected, 1 = attrset 2 = attrset function argument
 		isRec := token.Type == lexer.TokenKwRec
 		if isRec {
+			mode = 1 // rec = must be an attrset!
 			nextToken := lex.Next()
 			if nextToken.Type != lexer.TokenLeftBrace {
 				return lhs, errors.New("expected { got: " + nextToken.String())
 			}
 		}
-		items := []ast.AttrsetItem{}
+		// stuff for attrset
+		attrsItems := []ast.AttrsetItem{}
+		// stuff for attrset function argument
+		attrsLambdaArgs := []ast.AttrsetLambdaArgItem{}
+		ignoreExtraAttrs := false
+		attrsLoop:
 		for {
 			nextToken := lex.Peek()
 			if nextToken.Type == lexer.TokenRightBrace {
 				lex.Next()
 				break
 			}
-			exprName, err := parse(lex, 0)
-			if err != nil {
-				return exprName, err
+			var exprNamePtr *ast.Expr = nil
+			switch mode {
+			case 0: // detect
+				switch nextToken.Type {
+				case lexer.TokenTripleDot:
+					mode = 2
+				case lexer.TokenIdentifier:
+					// faaaah now we got a pain in the ass cuz we need to know the token after this, so lets parse the name and see
+					exprName, err := parse(lex, 0)
+					if err != nil {
+						return exprName, err
+					}
+					exprNamePtr = &exprName
+					nextToken = lex.Peek()
+					if nextToken.Type == lexer.TokenComma {
+						mode = 2
+						goto case0Fallthrough // HACK: The attrset case will fallthrough again if mode == 2 which then leads us to the correct case :DDDD
+					} else {
+						// this is an attrset
+						mode = 1
+						goto case0Fallthrough
+					}
+				default:
+					// this is an attrset
+					mode = 1
+				}
+				continue
+				case0Fallthrough:
+			fallthrough
+			case 1: // attrset
+				var exprValue ast.Expr
+				var err error
+				if mode == 2 {
+					goto case1Fallthrough
+				}
+				if exprNamePtr == nil {
+					exprName, err := parse(lex, 0)
+					if err != nil {
+						return exprName, err
+					}
+					exprNamePtr = &exprName
+				}
+				nextToken = lex.Next()
+				if nextToken.Type != lexer.TokenEquals {
+					return lhs, errors.New("expected = got: " + nextToken.String())
+				}
+				exprValue, err = parse(lex, 0)
+				if err != nil {
+					return exprValue, err
+				}
+				nextToken = lex.Next()
+				if nextToken.Type != lexer.TokenSemicolon {
+					return lhs, errors.New("expected ; got: " + nextToken.String())
+				}
+				attrsItems = append(attrsItems, ast.AttrsetItem{Name: *exprNamePtr, Value: exprValue})
+				continue
+				case1Fallthrough:
+			fallthrough
+			case 2: // attrset function argument
+				var nextToken lexer.Token
+				// special case in case we fell through from detect
+				if exprNamePtr != nil {
+					identExpr, ok := (*exprNamePtr).(ast.Identifier)
+					if !ok {
+						return lhs, errors.New("expected ast.Identifier")
+					}
+					nextToken = lexer.Token{Type: lexer.TokenIdentifier, Value: identExpr.Value}
+				} else {
+					nextToken = lex.Next()
+				}
+				switch nextToken.Type {
+				case lexer.TokenIdentifier:
+				case lexer.TokenTripleDot:
+					ignoreExtraAttrs = true
+					// check the next token to make sure it's } since ... should always be the last thing
+					nextToken = lex.Next()
+					if nextToken.Type != lexer.TokenRightBrace {
+						return lhs, errors.New("expected } after ... got: " + nextToken.String())
+					}
+					break attrsLoop
+				default:
+					return lhs, errors.New("expected identifier or ... got: " + nextToken.String())
+				}
+				// if we are here nextToken is an identifier
+				name := nextToken.AsString()
+
+				hasDefault := false
+				var exprDefault ast.Expr
+				nextToken = lex.Peek()
+				if nextToken.Type == lexer.TokenQuestion {
+					lex.Next() // consume question mark
+					hasDefault = true
+					var err error
+					exprDefault, err = parse(lex, 0)
+					if err != nil {
+						return exprDefault, err
+					}
+					// peek the next token again for the code below
+					nextToken = lex.Peek()
+				}
+				switch nextToken.Type {
+				case lexer.TokenComma:
+					lex.Next() // consume comma
+				case lexer.TokenRightBrace:
+				default:
+					return lhs, errors.New("expected , or } got: " + nextToken.String())
+				}
+				attrsLambdaArgs = append(attrsLambdaArgs, ast.AttrsetLambdaArgItem{Name: name, HasDefault: hasDefault, Default: exprDefault})
+				continue
 			}
-			nextToken = lex.Next()
-			if nextToken.Type != lexer.TokenEquals {
-				return lhs, errors.New("expected = got: " + nextToken.String())
-			}
-			exprValue, err := parse(lex, 0)
-			if err != nil {
-				return exprValue, err
-			}
-			nextToken = lex.Next()
-			if nextToken.Type != lexer.TokenSemicolon {
-				return lhs, errors.New("expected ; got: " + nextToken.String())
-			}
-			items = append(items, ast.AttrsetItem{Name: exprName, Value: exprValue})
 		}
-		lhs = ast.Attrset{Items: items, Recursive: isRec}
+		switch mode {
+		case 0, 1: // attrset
+			lhs = ast.Attrset{Items: attrsItems, Recursive: isRec}
+		case 2:
+			hasBind := false
+			var bind string
+			nextToken := lex.Peek()
+			if nextToken.Type == lexer.TokenAt {
+				lex.Next() // consume @
+				nextToken := lex.Next()
+				if nextToken.Type != lexer.TokenIdentifier {
+					return lhs, errors.New("expected identifier after @ got: " + nextToken.String())
+				}
+				hasBind = true
+				bind = nextToken.AsString()
+			}
+			lhs = ast.AttrsetLambdaArg{Items: attrsLambdaArgs, IgnoreExtraAttrs: ignoreExtraAttrs, HasBind: hasBind, Bind: bind}
+		}
 	case lexer.TokenLeftParen:
 		var err error
 		lhs, err = parse(lex, 0)
@@ -198,7 +316,7 @@ func parse(lex *lexer.Lexer, minBp int) (ast.Expr, error) {
 		// Lambda
 		if nextToken.Type == lexer.TokenColon {
 			switch lhs.(type) {
-			case ast.Identifier:
+			case ast.Identifier, ast.AttrsetLambdaArg:
 			default:
 				return lhs, errors.New("invalid function arg type")
 			}
