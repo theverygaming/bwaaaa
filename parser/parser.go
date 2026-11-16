@@ -43,6 +43,18 @@ func parse(lex *lexer.Lexer, minBp int) (ast.Expr, error) {
 		lhs = ast.PathString{Value: token.AsString()}
 	case lexer.TokenIdentifier:
 		lhs = ast.Identifier{Value: token.AsString()}
+	case lexer.TokenExclamation:
+		expr, err := parse(lex, 50)
+		if err != nil {
+			return expr, err
+		}
+		lhs = ast.UnaryOp{Op: ast.UnaryOpBoolInvert, Rhs: expr}
+	case lexer.TokenMinus:
+		expr, err := parse(lex, 50)
+		if err != nil {
+			return expr, err
+		}
+		lhs = ast.UnaryOp{Op: ast.UnaryOpNegate, Rhs: expr}
 	// if..then..else
 	case lexer.TokenKwIf:
 		exprIf, err := parse(lex, 0)
@@ -172,7 +184,6 @@ func parse(lex *lexer.Lexer, minBp int) (ast.Expr, error) {
 		if nextToken.Type != lexer.TokenRightParen {
 			return lhs, errors.New("expected ) got: " + nextToken.String())
 		}
-	// TODO: prefix operators (-, !)
 	default:
 		return lhs, errors.New("unexpected token: " + token.String())
 	}

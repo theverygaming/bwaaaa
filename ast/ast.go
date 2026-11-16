@@ -7,6 +7,10 @@ type Expr interface {
 	Dump(indent int, indentIncrement int) string
 }
 
+func indentString(indent int) string {
+	return strings.Repeat(" ", indent)
+}
+
 type BinOpType int
 
 const (
@@ -24,10 +28,6 @@ type BinOp struct {
 	Op BinOpType
 	Lhs Expr
 	Rhs Expr
-}
-
-func indentString(indent int) string {
-	return strings.Repeat(" ", indent)
 }
 
 func (x BinOp) Dump(indent int, indentIncrement int) string {
@@ -54,6 +54,33 @@ func (x BinOp) Dump(indent int, indentIncrement int) string {
 	idn := indent + indentIncrement
 	return ids + "(BinOp " + op + "\n" +
 			x.Lhs.Dump(idn, indentIncrement) + "\n" + 
+			x.Rhs.Dump(idn, indentIncrement) + "\n" +
+			ids + ")"
+}
+
+type UnaryOpType int
+
+const (
+	UnaryOpBoolInvert UnaryOpType = iota
+	UnaryOpNegate
+)
+
+type UnaryOp struct {
+	Op UnaryOpType
+	Rhs Expr
+}
+
+func (x UnaryOp) Dump(indent int, indentIncrement int) string {
+	var op string
+	switch x.Op {
+	case UnaryOpBoolInvert:
+		op = "!"
+	case UnaryOpNegate:
+		op = "-"
+	}
+	ids := indentString(indent)
+	idn := indent + indentIncrement
+	return ids + "(UnaryOp " + op + "\n" +
 			x.Rhs.Dump(idn, indentIncrement) + "\n" +
 			ids + ")"
 }
