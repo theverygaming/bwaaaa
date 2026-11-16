@@ -213,6 +213,20 @@ func (x Attrset) Dump(indent int, indentIncrement int) string {
 			ids + ")"
 }
 
+type Lambda struct {
+	Arg Expr
+	Body Expr
+}
+
+func (x Lambda) Dump(indent int, indentIncrement int) string {
+	ids := indentString(indent)
+	idn := indent + indentIncrement
+	return ids + "(Lambda\n" +
+			x.Arg.Dump(idn, indentIncrement) + "\n" +
+			x.Body.Dump(idn, indentIncrement) + "\n" +
+			ids + ")"
+}
+
 // basic types
 type String struct {
 	Value string

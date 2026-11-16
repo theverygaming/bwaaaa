@@ -197,6 +197,25 @@ func parse(lex *lexer.Lexer, minBp int) (ast.Expr, error) {
 			break
 		}
 
+		// Lambda
+		if nextToken.Type == lexer.TokenColon {
+			switch lhs.(type) {
+			case ast.Identifier:
+			default:
+				return lhs, errors.New("invalid function arg type")
+			}
+
+			// consume colon
+			lex.Next()
+
+			exprBody, err := parse(lex, 0)
+			if err != nil {
+				return exprBody, err
+			}
+			lhs = ast.Lambda{Arg: lhs, Body: exprBody}
+			continue
+		}
+
 		// Attribute Selection
 		if nextToken.Type == lexer.TokenDot {
 			lhsBp := 200
