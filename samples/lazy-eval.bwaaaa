@@ -1,0 +1,23 @@
+#let
+#    recursiveattrset = rec {
+#        a = x: x + " waow" + b;
+#        b = " meow";
+#        c = a ("meow" + recursiveattrset.b);
+#        res = recursiveattrset.c + b + waff;
+#    };
+#    waff = " waff";
+#    result = recursiveattrset.res + waff;
+#in
+#result + recursiveattrset.b
+
+let
+    recursiveattrset = rec {
+        a = " waow" + b;
+        b = " meow";
+        c = ("meow" + recursiveattrset.b);
+        res = recursiveattrset.c + b + waff;
+    };
+    waff = " waff";
+    result = recursiveattrset.res + waff;
+in
+result + recursiveattrset.b
