@@ -48,6 +48,12 @@ func (env *Env) Set(key string, thunk *Thunk) error {
 	return nil
 }
 
+type FnDef struct {
+	argName string
+	env *Env
+	body ast.Expr
+}
+
 func (ip *Interpreter) Eval(expr ast.Expr) (any, error) {
 	return ip.evalForce(expr, ip.env)
 }
@@ -122,6 +128,39 @@ func (ip *Interpreter) eval(expr ast.Expr, env *Env) (any, error) {
 			return attrset, fmt.Errorf("attribute %s not in attrset", node.Attr)
 		}
 		return val, nil
+	case ast.FnCall:
+		// prepare call
+		fn, err := ip.evalForce(node.Fn, env)
+		if err != nil {
+			return fn, err
+		}
+		fnDef, isFnDef := fn.(FnDef)
+		if !isFnDef {
+			return fnDef, fmt.Errorf("expected FnDef for FnCall function, got %T", fn)
+		}
+		// actually call
+		callEnv := NewEnv(fnDef.env)
+		callEnv.Set(fnDef.argName, &Thunk{
+			expr: node.Arg,
+			env: env,
+			evaluated: false,
+			value: nil,
+		})
+		res, err := ip.eval(fnDef.body, callEnv)
+		if err != nil {
+			return res, err
+		}
+		return res, nil
+	case ast.Lambda:
+		arg, isIdent := node.Arg.(ast.Identifier)
+		if !isIdent {
+			return arg, fmt.Errorf("expected Identifier for lambda arg, got %T", node.Arg)
+		}
+		return FnDef{
+			argName: arg.Value,
+			env: env,
+			body: node.Body,
+		}, nil
 	case ast.BinOp:
 		lhs, err := ip.evalForce(node.Lhs, env)
 		if err != nil {
