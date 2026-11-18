@@ -266,21 +266,21 @@ func (lex *Lexer) nextToken() Token {
 	r2, err2 := lex.next()
 	r3, err3 := lex.next()
 	if r1 == '=' {
-		if err2 != nil && r2 == '=' {
+		if err2 == nil && r2 == '=' {
 			return Token{Type: TokenEqualsEquals, Value: nil}
 		}
 		lex.pos = startr2
 		return Token{Type: TokenEquals, Value: nil}
 	}
 	if r1 == '!' {
-		if err2 != nil && r2 == '=' {
+		if err2 == nil && r2 == '=' {
 			return Token{Type: TokenExclamationEquals, Value: nil}
 		}
 		lex.pos = startr2
 		return Token{Type: TokenExclamation, Value: nil}
 	}
 	if r1 == '.' {
-		if err2 != nil && r2 == '.' && err3 != nil && r3 == '.' {
+		if err2 == nil && r2 == '.' && err3 == nil && r3 == '.' {
 			return Token{Type: TokenTripleDot, Value: nil}
 		}
 		lex.pos = startr2
