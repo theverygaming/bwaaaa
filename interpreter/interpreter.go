@@ -54,6 +54,19 @@ type FnDef struct {
 	body ast.Expr
 }
 
+type FnDefAttrsArg struct {
+	name string
+	defaultVal *Thunk
+}
+
+type FnDefAttrs struct {
+	items []FnDefAttrsArg
+	ignoreExtraAttrs bool
+	bind *string
+	env *Env
+	body ast.Expr
+}
+
 func (ip *Interpreter) Eval(expr ast.Expr) (any, error) {
 	return ip.evalForce(expr, ip.env)
 }
@@ -134,33 +147,115 @@ func (ip *Interpreter) eval(expr ast.Expr, env *Env) (any, error) {
 		if err != nil {
 			return fn, err
 		}
-		fnDef, isFnDef := fn.(FnDef)
-		if !isFnDef {
-			return fnDef, fmt.Errorf("expected FnDef for FnCall function, got %T", fn)
-		}
-		// actually call
-		callEnv := NewEnv(fnDef.env)
-		callEnv.Set(fnDef.argName, &Thunk{
+		arg := &Thunk{
 			expr: node.Arg,
 			env: env,
 			evaluated: false,
 			value: nil,
-		})
-		res, err := ip.eval(fnDef.body, callEnv)
-		if err != nil {
-			return res, err
 		}
-		return res, nil
+		// actually call
+		fnDef, isFnDef := fn.(FnDef)
+		if isFnDef {
+			callEnv := NewEnv(fnDef.env)
+			callEnv.Set(fnDef.argName, arg)
+			res, err := ip.eval(fnDef.body, callEnv)
+			if err != nil {
+				return res, err
+			}
+			return res, nil
+		}
+		fnDefAttrs, isFnDefAttrs := fn.(FnDefAttrs)
+		if isFnDefAttrs {
+			callEnv := NewEnv(fnDefAttrs.env)
+			// grab the arg and verify it's actually an attrset like we expect :)
+			argVal, err := ip.force(arg)
+			if err != nil {
+				return argVal, err
+			}
+			argAttrs, isArgValAttrs := argVal.(map[string]*Thunk)
+			if !isArgValAttrs {
+				return argAttrs, fmt.Errorf("expected attrset as function call arg, got %T", argVal)
+			}
+			// grab each arg and handle defaults
+			for _, i := range fnDefAttrs.items {
+				var argVal *Thunk = nil
+				if val, exists := argAttrs[i.name]; exists {
+					argVal = val
+				}
+				if argVal == nil && i.defaultVal != nil {
+					argVal = i.defaultVal
+				}
+				if argVal == nil {
+					return nil, fmt.Errorf("attrset function call missing argument %s", i.name)
+				}
+				callEnv.Set(i.name, argVal)
+			}
+			// {...}@args syntax (binds the incoming attrset)
+			if fnDefAttrs.bind != nil {
+				callEnv.Set(*fnDefAttrs.bind, arg)
+			}
+			// check there's no extra attributes if we have to
+			if !fnDefAttrs.ignoreExtraAttrs {
+				for name := range argAttrs {
+					found := false
+					for _, i := range fnDefAttrs.items {
+						if i.name == name {
+							found = true
+							break
+						}
+					}
+					if !found {
+						return nil, fmt.Errorf("attrset function call with extra attribute %s", name)
+					}
+				}
+			}
+			res, err := ip.eval(fnDefAttrs.body, callEnv)
+			if err != nil {
+				return res, err
+			}
+			return res, nil
+		}
+		return nil, fmt.Errorf("expected FnDef or FnDefAttrs for FnCall function, got %T", fn)
 	case ast.Lambda:
 		arg, isIdent := node.Arg.(ast.Identifier)
-		if !isIdent {
-			return arg, fmt.Errorf("expected Identifier for lambda arg, got %T", node.Arg)
+		if isIdent {
+			return FnDef{
+				argName: arg.Value,
+				env: env,
+				body: node.Body,
+			}, nil
 		}
-		return FnDef{
-			argName: arg.Value,
-			env: env,
-			body: node.Body,
-		}, nil
+		aarg, isAttrsetLambdaArg := node.Arg.(ast.AttrsetLambdaArg)
+		if isAttrsetLambdaArg {
+			items := []FnDefAttrsArg{}
+			for _, i := range aarg.Items {
+				var defaultVal *Thunk = nil
+				if i.HasDefault {
+					defaultVal = &Thunk{
+						expr: i.Default,
+						env: env,
+						evaluated: false,
+						value: nil,
+					}
+				}
+				items = append(items, FnDefAttrsArg{
+					name: i.Name,
+					defaultVal: defaultVal,
+				})
+			}
+			var bind *string = nil
+			if aarg.HasBind {
+				bind = &aarg.Bind
+			}
+			return FnDefAttrs{
+				items: items,
+				ignoreExtraAttrs: aarg.IgnoreExtraAttrs,
+				bind: bind,
+				env: env,
+				body: node.Body,
+			}, nil
+		}
+		return arg, fmt.Errorf("expected Identifier or AttrsetLambdaArg for lambda arg, got %T", node.Arg)
 	case ast.BinOp:
 		lhs, err := ip.evalForce(node.Lhs, env)
 		if err != nil {

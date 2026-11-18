@@ -3,9 +3,11 @@ let
         a = x: x + " waow" + b;
         b = " meow";
         c = a ("meow" + recursiveattrset.b);
+        d = {a, b ? "hello world!"}: "d: a is " + a + " b is " + b;
+        e = (d {a = "a"; b = "b";}) + "\n" + (d {a = "a";});
         res = recursiveattrset.c + b + waff;
     };
     waff = " waff";
     result = recursiveattrset.res + waff;
 in
-result + recursiveattrset.b
+result + recursiveattrset.b + "\n" + recursiveattrset.e
