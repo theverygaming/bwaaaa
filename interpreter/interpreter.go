@@ -8,8 +8,8 @@ type Interpreter struct {
 	env *Env
 }
 
-func New() *Interpreter {
-	ip := Interpreter{env: &Env{parent: nil, vars: make(map[string]*Thunk)}}
+func New(coreEnv map[string]*Thunk) *Interpreter {
+	ip := Interpreter{env: &Env{parent: nil, vars: coreEnv}}
 	return &ip
 }
 
@@ -18,6 +18,14 @@ type Thunk struct {
 	env *Env
 	evaluated bool
 	value any
+}
+
+func NewThunkEvaluated(value any) *Thunk {
+	return &Thunk{
+		env: nil,
+		evaluated: true,
+		value: value,
+	}
 }
 
 type Env struct {
@@ -67,8 +75,20 @@ type FnDefAttrs struct {
 	body ast.Expr
 }
 
+type FnDefExternal struct {
+	fn func(ip *Interpreter, arg *Thunk) (any, error)
+}
+
+func NewFnDefExternal(fn func(ip *Interpreter, arg *Thunk) (any, error)) FnDefExternal {
+	return FnDefExternal{fn: fn}
+}
+
 func (ip *Interpreter) Eval(expr ast.Expr) (any, error) {
 	return ip.evalForce(expr, ip.env)
+}
+
+func (ip *Interpreter) Force(thunk *Thunk) (any, error) {
+	return ip.force(thunk)
 }
 
 func (ip *Interpreter) eval(expr ast.Expr, env *Env) (any, error) {
@@ -158,11 +178,7 @@ func (ip *Interpreter) eval(expr ast.Expr, env *Env) (any, error) {
 		if isFnDef {
 			callEnv := NewEnv(fnDef.env)
 			callEnv.Set(fnDef.argName, arg)
-			res, err := ip.eval(fnDef.body, callEnv)
-			if err != nil {
-				return res, err
-			}
-			return res, nil
+			return ip.eval(fnDef.body, callEnv)
 		}
 		fnDefAttrs, isFnDefAttrs := fn.(FnDefAttrs)
 		if isFnDefAttrs {
@@ -209,13 +225,13 @@ func (ip *Interpreter) eval(expr ast.Expr, env *Env) (any, error) {
 					}
 				}
 			}
-			res, err := ip.eval(fnDefAttrs.body, callEnv)
-			if err != nil {
-				return res, err
-			}
-			return res, nil
+			return ip.eval(fnDefAttrs.body, callEnv)
 		}
-		return nil, fmt.Errorf("expected FnDef or FnDefAttrs for FnCall function, got %T", fn)
+		fnDefExternal, ExFnDefExternal := fn.(FnDefExternal)
+		if ExFnDefExternal {
+			return fnDefExternal.fn(ip, arg)
+		}
+		return nil, fmt.Errorf("expected FnDef, FnDefAttrs or FnDefExternal for FnCall function, got %T", fn)
 	case ast.Lambda:
 		arg, isIdent := node.Arg.(ast.Identifier)
 		if isIdent {

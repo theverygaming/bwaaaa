@@ -10,4 +10,4 @@ let
     waff = " waff";
     result = recursiveattrset.res + waff;
 in
-result + recursiveattrset.b + "\n" + recursiveattrset.e
+builtins.throw (result + recursiveattrset.b + "\n" + recursiveattrset.e)
