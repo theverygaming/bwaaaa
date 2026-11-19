@@ -103,7 +103,12 @@ func (ip *Interpreter) eval(expr ast.Expr, env *Env) (any, error) {
 				value: nil,
 			})
 		}
-		return ip.eval(node.In, newEnv)
+		return &Thunk{
+			expr: node.In,
+			env: newEnv,
+			evaluated: false,
+			value: nil,
+		}, nil
 	case ast.Identifier:
 		return env.Get(node.Value)
 	case ast.String:
@@ -178,7 +183,12 @@ func (ip *Interpreter) eval(expr ast.Expr, env *Env) (any, error) {
 		if isFnDef {
 			callEnv := NewEnv(fnDef.env)
 			callEnv.Set(fnDef.argName, arg)
-			return ip.eval(fnDef.body, callEnv)
+			return &Thunk{
+				expr: fnDef.body,
+				env: callEnv,
+				evaluated: false,
+				value: nil,
+			}, nil
 		}
 		fnDefAttrs, isFnDefAttrs := fn.(FnDefAttrs)
 		if isFnDefAttrs {
@@ -225,7 +235,12 @@ func (ip *Interpreter) eval(expr ast.Expr, env *Env) (any, error) {
 					}
 				}
 			}
-			return ip.eval(fnDefAttrs.body, callEnv)
+			return &Thunk{
+				expr: fnDefAttrs.body,
+				env: callEnv,
+				evaluated: false,
+				value: nil,
+			}, nil
 		}
 		fnDefExternal, ExFnDefExternal := fn.(FnDefExternal)
 		if ExFnDefExternal {
