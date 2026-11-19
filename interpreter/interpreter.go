@@ -117,6 +117,10 @@ func (ip *Interpreter) eval(expr ast.Expr, env *Env) (any, error) {
 		return env.Get(node.Value)
 	case ast.String:
 		return node.Value, nil
+	case ast.Boolean:
+		return node.Value, nil
+	case ast.Null:
+		return nil, nil
 	case ast.Attrset:
 		attrsEnv := env
 		if node.Recursive {
