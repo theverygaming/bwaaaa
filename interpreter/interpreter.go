@@ -87,6 +87,10 @@ func (ip *Interpreter) Eval(expr ast.Expr) (any, error) {
 	return ip.evalForce(expr, ip.env)
 }
 
+func (ip *Interpreter) EvalLazy(expr ast.Expr) (any, error) {
+	return ip.eval(expr, ip.env)
+}
+
 func (ip *Interpreter) Force(thunk *Thunk) (any, error) {
 	return ip.force(thunk)
 }
