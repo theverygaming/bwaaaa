@@ -12,8 +12,13 @@ import "encoding/base64"
 import "crypto/sha256"
 import "io"
 import "net/http"
+import "bwaaaa/bwaaaa/store"
 
 func main() {
+    store, err := store.New("./meowstore/")
+    if err != nil {
+        log.Fatal(err)
+    }
     content, err := os.ReadFile("meow/meow.bwaaaa")
     if err != nil {
         log.Fatal(err)
@@ -150,6 +155,16 @@ func main() {
                 if !strings.HasPrefix(hash, "sha256-") {
                     return nil, fmt.Errorf("fetchhttp called with unsupported hash format %s", hash)
                 }
+                hashBytes, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(hash, "sha256-"))
+                if err != nil {
+                    return nil, err
+                }
+
+                // check if what we expect is already in the store
+                storePath, err := store.GetPath(name, hashBytes)
+                if err == nil {
+                    return storePath, nil
+                }
 
                 // HTTP request
                 resp, err := http.Get(url)
@@ -195,12 +210,7 @@ func main() {
                     return nil, err
                 }
 
-                // TODO: we need a store implementation then we could actually copy the temporary file to the store :)
-                outPath := tmpf.Name() + "-fetched"
-                if err := os.Rename(tmpf.Name(), outPath); err != nil {
-                    return nil, err
-                }
-                return outPath, nil
+                return store.CopyToStore(tmpf.Name(), name, hashBytes)
             })),
         }),
     }
