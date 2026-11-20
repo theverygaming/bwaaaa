@@ -12,6 +12,7 @@ import "encoding/base64"
 import "io"
 import "net/http"
 import "bwaaaa/bwaaaa/store"
+import tarballlib "bwaaaa/bwaaaa/helpers/tarball"
 
 func main() {
     st, err := store.New("./meowstore/")
@@ -146,6 +147,26 @@ func main() {
                     executable = executableB
                 }
 
+                // get tarball arg
+                tarball := false
+                tarballT := argAttrs["tarball"]
+                if tarballT != nil {
+                    tarballF, err := ip.Force(tarballT)
+                    if err != nil {
+                        return nil, err
+                    }
+                    tarballB, isString := tarballF.(bool)
+                    if !isString {
+                        return nil, fmt.Errorf("fetchhttp called with invalid type for tarball arg %T: %v", tarballF, tarballF)
+                    }
+                    tarball = tarballB
+                }
+
+                // some sanity checks
+                if executable && tarball {
+                    return nil, fmt.Errorf("fetchhttp: executable and tarball are mutually exclusive.")
+                }
+
                 // parse the hash
                 if hash == "" {
                     hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
@@ -175,35 +196,52 @@ func main() {
                     return nil, fmt.Errorf("unexpected HTTP status fetching URL: %s code: %d", url, resp.StatusCode)
                 }
 
-                // prepare a temporary file
-                tmpf, err := os.CreateTemp("", name)
-                if err != nil {
-                    return nil, err
-                }
-                defer os.Remove(tmpf.Name())
+                var tmpPath string
+                if !tarball {
+                    // prepare a temporary file
+                    tmpf, err := os.CreateTemp("", name)
+                    if err != nil {
+                        return nil, err
+                    }
+                    defer os.Remove(tmpf.Name())
 
-                // write to the temporary file
-                _, err = io.Copy(tmpf, resp.Body)
-                if err != nil {
-                    tmpf.Close()
-                    return nil, err
-                }
-                if err := tmpf.Close(); err != nil {
-                    return nil, err
-                }
+                    // write to the temporary file
+                    _, err = io.Copy(tmpf, resp.Body)
+                    if err != nil {
+                        tmpf.Close()
+                        return nil, err
+                    }
+                    if err := tmpf.Close(); err != nil {
+                        return nil, err
+                    }
 
-                // set the correct permissions on the temporary file
-                var destPerms os.FileMode = 0444
-                if executable {
-                    destPerms = 0555
-                }
-                if err := os.Chmod(tmpf.Name(), destPerms); err != nil {
-                    return nil, err
+                    // set the correct permissions on the temporary file
+                    var destPerms os.FileMode = 0444
+                    if executable {
+                        destPerms = 0555
+                    }
+                    if err := os.Chmod(tmpf.Name(), destPerms); err != nil {
+                        return nil, err
+                    }
+
+                    tmpPath = tmpf.Name()
+                } else {
+                    // prepare a temporary directory
+                    tmpd, err := os.MkdirTemp("", name)
+                    if err != nil {
+                        return nil, err
+                    }
+                    defer os.RemoveAll(tmpd)
+                    if err := tarballlib.ExtractTarGz(tmpd, resp.Body); err != nil {
+                        return nil, err
+                    }
+                    tmpPath = tmpd
                 }
 
                 // hash
-                storeHash, err := store.Hash(tmpf.Name())
+                storeHash, err := store.Hash(tmpPath)
                 if err != nil {
+                    fmt.Println(tmpPath)
                     return nil, err
                 }
                 storeHashBytes := storeHash.Sum(nil)
@@ -214,7 +252,7 @@ func main() {
                     return nil, fmt.Errorf("fetchhttp expected hash %s got: %s", hash, hashGot)
                 }
 
-                return st.CopyToStore(tmpf.Name(), name, storeHashBytes)
+                return st.CopyToStore(tmpPath, name, storeHashBytes)
             })),
         }),
     }
