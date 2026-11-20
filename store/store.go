@@ -138,10 +138,10 @@ func copyToStore(src string, dst string) error {
 	}
 	copyFile := func (src string, dst string, srcStat os.FileInfo) error {
 		if srcStat.Mode().IsRegular() {
-			var dstPerm os.FileMode = 0444 // r--
+			var dstPerm os.FileMode = 0444 // r--r--r--
 			// executable?
 			if isExecutable(srcStat.Mode()) {
-				dstPerm = 0555 // r-x
+				dstPerm = 0555 // r-xr-xr-x
 			}
 
 			out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE, dstPerm)
@@ -174,7 +174,7 @@ func copyToStore(src string, dst string) error {
 		if err != nil {
 			return err
 		}
-		if err := os.Mkdir(dst, 0555 /* r-x */); err != nil {
+		if err := os.Mkdir(dst, 0755 /* rwxr-xr-x */); err != nil {
 			return err
 		}
 		for _, entry := range entries {
@@ -263,11 +263,11 @@ func (st *Store) check() error {
 
 func storeInit(basePath string) error {
 	// main dir
-	if err := os.MkdirAll(basePath, 0777); err != nil {
+	if err := os.MkdirAll(basePath, 0755 /* rwxr-xr-x */); err != nil {
 		return err
 	}
 	// /store
-	if err := os.Mkdir(path.Join(basePath, "store"), 0777); err != nil {
+	if err := os.Mkdir(path.Join(basePath, "store"), 0755 /* rwxr-xr-x */); err != nil {
 		return err
 	}
 	return nil
