@@ -7,9 +7,106 @@ import "errors"
 import "encoding/base32"
 import "io"
 import "fmt"
+import "crypto/sha256"
+import "hash"
+import "encoding/binary"
 
 type Store struct {
 	basePath string
+}
+
+// hash suitable for things that belong into the store (returns the hasher it created, either you call Sum(nil) on it right away, or you hash extra things!)
+// similar general idea to Nix NAR
+func Hash(path string) (hash.Hash, error) {
+	hasher := sha256.New()
+	if err := hashInt(path, "", hasher); err != nil {
+		return nil, err
+	}
+	return hasher, nil
+}
+
+func hashInt(basePath string, archivePath string, hasher hash.Hash) error {
+	fullPath := path.Join(basePath, archivePath)
+	fullStat, err := os.Lstat(fullPath)
+	if err != nil {
+		return err
+	}
+	hashFile := func (basePath string, archivePath string, fullStat os.FileInfo, hasher hash.Hash) error {
+		fullPath := path.Join(basePath, archivePath)
+		if fullStat.Mode().IsRegular() {
+			descStr := archivePath + "RegularFile"
+			if isExecutable(fullStat.Mode()) {
+				descStr += "Executable"
+			}
+
+			in, err := os.Open(fullPath)
+			if err != nil {
+				return err
+			}
+			defer in.Close()
+
+			if err := binary.Write(hasher, binary.LittleEndian, uint64(len(descStr))); err != nil {
+				return err
+			}
+			if _, err := io.WriteString(hasher, descStr); err != nil {
+				return err
+			}
+
+			if err := binary.Write(hasher, binary.LittleEndian, uint64(fullStat.Size())); err != nil {
+				return err
+			}
+			if _, err := io.Copy(hasher, in); err != nil {
+				return err
+			}
+
+			return nil
+		}
+		switch fullStat.Mode() {
+		// TODO: handle symlinks here
+		default:
+			return fmt.Errorf("hashFile unsupported mode: %v", fullStat.Mode())
+		}
+	}
+	if fullStat.Mode().IsDir() {
+		// Why does this work? ReadDir sorts entries by name!
+		entries, err := os.ReadDir(fullPath)
+		if err != nil {
+			return err
+		}
+		descStr := archivePath + "Directory"
+		if err := binary.Write(hasher, binary.LittleEndian, uint64(len(descStr))); err != nil {
+			return err
+		}
+		if _, err := io.WriteString(hasher, descStr); err != nil {
+			return err
+		}
+		if err := binary.Write(hasher, binary.LittleEndian, uint64(len(entries))); err != nil {
+				return err
+			}
+		for _, entry := range entries {
+			archivePathF := path.Join(archivePath, entry.Name())
+			fullPathF := path.Join(basePath, archivePathF)
+
+			fullFStat, err := os.Lstat(fullPathF)
+			if err != nil {
+				return err
+			}
+
+			if fullFStat.Mode().IsDir() {
+				if err := hashInt(basePath, archivePathF, hasher); err != nil {
+					return err
+				}
+			} else {
+				if err := hashFile(basePath, archivePathF, fullFStat, hasher); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	} else {
+		return hashFile(basePath, archivePath, fullStat, hasher)
+	}
+	return nil
 }
 
 func New(basePath string) (*Store, error) {
@@ -29,6 +126,10 @@ func New(basePath string) (*Store, error) {
 	return st, nil
 }
 
+func isExecutable(mode os.FileMode) bool {
+	return (mode.Perm() & ((1 << 0) | (1 << 3) | (1 << 6))) != 0
+}
+
 func copyToStore(src string, dst string) error {
 	// with help from https://stackoverflow.com/a/56314145 - Posted by Oleg Neumyvakin, modified by community. See post 'Timeline' for change history - Retrieved 2026-11-20, License - CC BY-SA 4.0
 	srcStat, err := os.Lstat(src)
@@ -39,7 +140,7 @@ func copyToStore(src string, dst string) error {
 		if srcStat.Mode().IsRegular() {
 			var dstPerm os.FileMode = 0444 // r--
 			// executable?
-			if (srcStat.Mode().Perm() & ((1 << 0) | (1 << 3) | (1 << 6))) != 0 {
+			if isExecutable(srcStat.Mode()) {
 				dstPerm = 0555 // r-x
 			}
 
@@ -68,7 +169,7 @@ func copyToStore(src string, dst string) error {
 			return fmt.Errorf("copyFile unsupported mode: %v", srcStat.Mode())
 		}
 	}
-	if srcStat.Mode() == os.ModeDir {
+	if srcStat.Mode().IsDir() {
 		entries, err := os.ReadDir(src)
 		if err != nil {
 			return err
@@ -85,7 +186,7 @@ func copyToStore(src string, dst string) error {
 				return err
 			}
 
-			if srcFStat.Mode() == os.ModeDir {
+			if srcFStat.Mode().IsDir() {
 				if err := copyToStore(srcF, dstF); err != nil {
 					return err
 				}

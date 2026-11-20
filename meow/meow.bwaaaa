@@ -1,1 +1,4 @@
-builtins.throw (builtins.import "./meow/pkgs/bootstrap-busybox.bwaaaa" {})
+let
+    bootstrap = builtins.import "meow/pkgs/bootstrap-x86.bwaaaa" {};
+in
+builtins.throw bootstrap."hex0_seed"

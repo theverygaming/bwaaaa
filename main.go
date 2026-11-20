@@ -9,13 +9,12 @@ import "bwaaaa/bwaaaa/interpreter"
 import "path/filepath"
 import "strings"
 import "encoding/base64"
-import "crypto/sha256"
 import "io"
 import "net/http"
 import "bwaaaa/bwaaaa/store"
 
 func main() {
-    store, err := store.New("./meowstore/")
+    st, err := store.New("./meowstore/")
     if err != nil {
         log.Fatal(err)
     }
@@ -155,13 +154,13 @@ func main() {
                 if !strings.HasPrefix(hash, "sha256-") {
                     return nil, fmt.Errorf("fetchhttp called with unsupported hash format %s", hash)
                 }
-                hashBytes, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(hash, "sha256-"))
+                ExpectedHashBytes, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(hash, "sha256-"))
                 if err != nil {
                     return nil, err
                 }
 
                 // check if what we expect is already in the store
-                storePath, err := store.GetPath(name, hashBytes)
+                storePath, err := st.GetPath(name, ExpectedHashBytes)
                 if err == nil {
                     return storePath, nil
                 }
@@ -183,22 +182,14 @@ func main() {
                 }
                 defer os.Remove(tmpf.Name())
 
-                // write to the temporary file & hash
-                hasher := sha256.New()
-                mwriter := io.MultiWriter(hasher, tmpf)
-                _, err = io.Copy(mwriter, resp.Body)
+                // write to the temporary file
+                _, err = io.Copy(tmpf, resp.Body)
                 if err != nil {
                     tmpf.Close()
                     return nil, err
                 }
                 if err := tmpf.Close(); err != nil {
                     return nil, err
-                }
-
-                // verify the hash
-                hashGot := "sha256-" + base64.StdEncoding.EncodeToString(hasher.Sum(nil))
-                if hashGot != hash {
-                    return nil, fmt.Errorf("fetchhttp expected hash %s got: %s", hash, hashGot)
                 }
 
                 // set the correct permissions on the temporary file
@@ -210,7 +201,20 @@ func main() {
                     return nil, err
                 }
 
-                return store.CopyToStore(tmpf.Name(), name, hashBytes)
+                // hash
+                storeHash, err := store.Hash(tmpf.Name())
+                if err != nil {
+                    return nil, err
+                }
+                storeHashBytes := storeHash.Sum(nil)
+
+                // verify the hash
+                hashGot := "sha256-" + base64.StdEncoding.EncodeToString(storeHashBytes)
+                if hashGot != hash {
+                    return nil, fmt.Errorf("fetchhttp expected hash %s got: %s", hash, hashGot)
+                }
+
+                return st.CopyToStore(tmpf.Name(), name, storeHashBytes)
             })),
         }),
     }

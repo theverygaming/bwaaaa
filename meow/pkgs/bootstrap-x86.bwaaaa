@@ -1,0 +1,9 @@
+{...}: {
+    # bootstrap from https://github.com/NixOS/nixpkgs/blob/master/pkgs/os-specific/linux/minimal-bootstrap/stage0-posix/hex0.nix
+    hex0_seed = builtins.fetchhttp {
+        name = "hex0-seed";
+        executable = true;
+        url = "https://github.com/oriansj/bootstrap-seeds/raw/cedec6b8066d1db229b6c77d42d120a23c6980ed/POSIX/x86/hex0-seed";
+        hash = "sha256-kFyzU6EAMnaxIoEUwdV6/JaO7O7Dr7vlEQO4l7zMJMo=";
+    };
+}
