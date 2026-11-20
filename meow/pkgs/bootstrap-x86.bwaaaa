@@ -6,4 +6,10 @@
         url = "https://github.com/oriansj/bootstrap-seeds/raw/cedec6b8066d1db229b6c77d42d120a23c6980ed/POSIX/x86/hex0-seed";
         hash = "sha256-kFyzU6EAMnaxIoEUwdV6/JaO7O7Dr7vlEQO4l7zMJMo=";
     };
+    stage0_posix = builtins.fetchhttp {
+        name = "stage0-posix";
+        tarball = true;
+        url = "https://github.com/oriansj/stage0-posix/releases/download/Release_1.9.1/stage0-posix-1.9.1.tar.gz";
+        hash = "sha256-W6GEhLRefLlMcOQyH8vXXJMNKoAK90ldvUWgl9K1Rps=";
+    };
 }
