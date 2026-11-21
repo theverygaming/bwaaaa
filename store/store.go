@@ -202,8 +202,8 @@ func copyToStore(src string, dst string) error {
 	}
 }
 
-func (st *Store) CopyToStore(source string, name string, sha256sum []byte) (string, error) {
-	p, err := st.computePath(name, sha256sum)
+func (st *Store) CopyToStore(source string, name string, outputName string, sha256sum []byte) (string, error) {
+	p, err := st.computePath(name, outputName, sha256sum)
 	if err != nil {
 		return p, err
 	}
@@ -221,8 +221,8 @@ func (st *Store) CopyToStore(source string, name string, sha256sum []byte) (stri
 	return p, nil
 }
 
-func (st *Store) GetPath(name string, sha256sum []byte) (string, error) {
-	p, err := st.computePath(name, sha256sum)
+func (st *Store) GetPath(name string, outputName string, sha256sum []byte) (string, error) {
+	p, err := st.computePath(name, outputName, sha256sum)
 	if err != nil {
 		return p, err
 	}
@@ -233,20 +233,24 @@ func (st *Store) GetPath(name string, sha256sum []byte) (string, error) {
 	return p, nil
 }
 
-func (st *Store) computePath(name string, sha256sum []byte) (string, error) {
-	name, err := st.computeName(name, sha256sum)
+func (st *Store) computePath(name string, outputName string, sha256sum []byte) (string, error) {
+	name, err := st.computeName(name, outputName, sha256sum)
 	if err != nil {
 		return name, err
 	}
 	return path.Join(st.basePath, "store", name), nil
 }
 
-func (st *Store) computeName(name string, sha256sum []byte) (string, error) {
+func (st *Store) computeName(name string, outputName string, sha256sum []byte) (string, error) {
 	if len(sha256sum) != 32 {
 		return "", errors.New("sha256sum is not 32 bytes")
 	}
+	suffix := ""
+	if outputName != "default" {
+		suffix = "-" + outputName
+	}
 	// same alphabet as nix https://nix.dev/manual/nix/2.35/protocols/nix32.html
-	return base32.NewEncoding("0123456789abcdfghijklmnpqrsvwxyz").WithPadding(base32.NoPadding).EncodeToString(sha256sum) + "-" + name, nil
+	return base32.NewEncoding("0123456789abcdfghijklmnpqrsvwxyz").WithPadding(base32.NoPadding).EncodeToString(sha256sum) + "-" + name + suffix, nil
 }
 
 func (st *Store) check() error {

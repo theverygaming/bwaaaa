@@ -181,7 +181,7 @@ func main() {
                 }
 
                 // check if what we expect is already in the store
-                storePath, err := st.GetPath(name, ExpectedHashBytes)
+                storePath, err := st.GetPath(name, "default", ExpectedHashBytes)
                 if err == nil {
                     return storePath, nil
                 }
@@ -252,7 +252,7 @@ func main() {
                     return nil, fmt.Errorf("fetchhttp expected hash %s got: %s", hash, hashGot)
                 }
 
-                return st.CopyToStore(tmpPath, name, storeHashBytes)
+                return st.CopyToStore(tmpPath, name, "default", storeHashBytes)
             })),
         }),
     }
