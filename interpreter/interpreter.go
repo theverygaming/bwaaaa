@@ -160,6 +160,20 @@ func (ip *Interpreter) eval(expr ast.Expr, env *Env) (any, error) {
 			items[name] = valThunk
 		}
 		return items, nil
+	case ast.List:
+		items := []*Thunk{}
+		for _, it := range node.Items {
+			items = append(
+				items,
+				&Thunk{
+					expr: it,
+					env: env,
+					evaluated: false,
+					value: nil,
+				},
+			)
+		}
+		return items, nil
 	case ast.AttrGet:
 		lhs, err := ip.evalForce(node.Lhs, env)
 		if err != nil {
