@@ -1,15 +1,30 @@
-{...}: {
+{...}:
+let
+    hex0_hash = "sha256-kFyzU6EAMnaxIoEUwdV6/JaO7O7Dr7vlEQO4l7zMJMo=";
+in rec {
     # bootstrap from https://github.com/NixOS/nixpkgs/blob/master/pkgs/os-specific/linux/minimal-bootstrap/stage0-posix/hex0.nix
     hex0_seed = builtins.fetchhttp {
         name = "hex0-seed";
         executable = true;
         url = "https://github.com/oriansj/bootstrap-seeds/raw/cedec6b8066d1db229b6c77d42d120a23c6980ed/POSIX/x86/hex0-seed";
-        hash = "sha256-kFyzU6EAMnaxIoEUwdV6/JaO7O7Dr7vlEQO4l7zMJMo=";
+        hash = hex0_hash;
     };
     stage0_posix = builtins.fetchhttp {
         name = "stage0-posix";
         tarball = true;
         url = "https://github.com/oriansj/stage0-posix/releases/download/Release_1.9.1/stage0-posix-1.9.1.tar.gz";
         hash = "sha256-W6GEhLRefLlMcOQyH8vXXJMNKoAK90ldvUWgl9K1Rps=";
+    };
+    hex0 = builtins.derivation {
+        name = "hex0";
+        buildPlatform = "x86-linux";
+        builder = builtins.outPathPlaceholder hex0_seed "default";
+        args = [ ((builtins.outPathPlaceholder stage0_posix "default") + "/stage0-posix-1.9.1/x86/hex0_x86.hex0") (builtins.selfOutPathPlaceholder "default") ];
+        buildInputs = [
+            hex0_seed
+            stage0_posix
+        ];
+        outputMode = "fixed";
+        fixedHash = hex0_hash;
     };
 }

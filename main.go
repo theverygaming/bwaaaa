@@ -13,6 +13,185 @@ import "io"
 import "net/http"
 import "bwaaaa/bwaaaa/store"
 import tarballlib "bwaaaa/bwaaaa/helpers/tarball"
+import "crypto/sha256"
+import "encoding/binary"
+import "encoding/hex"
+import "sort"
+import "bytes"
+
+type DerivationOutputMode int
+
+const (
+    OutputInputAddressed DerivationOutputMode = iota
+    OutputContentAddressed
+    OutputFixed // NOTE: fixed output derivations can only have a single output named "default"
+)
+
+type Derivation struct {
+    name string
+    outputs []string
+    outputMode DerivationOutputMode
+    // for outputMode=OutputFixed specifically
+    fixedHashSha256 []byte
+    // optional. Sometimes derivations may have no build information attached to them.
+    buildInfo *DerivationBuildInfo
+    // cached hash
+    hashCachedSha256 []byte
+}
+
+type DerivationBuildInfo struct {
+    buildPlatform string // platform the build is executed on
+    builder string // builder executable
+    args []string // builder args
+    buildInputs []*Derivation // FIXME: deduplicate (based on hash)
+    runtimeInputs []*Derivation // FIXME: deduplicate (based on hash)
+    env map[string]string
+    buildFiles map[string]string // content will be copied into build env as files and pointed to by env vars F_<caps_name>
+}
+
+func (drv *Derivation) Hash() ([]byte, error) {
+    if len(drv.hashCachedSha256) == 32 {
+        return drv.hashCachedSha256, nil
+    }
+    hasher := sha256.New()
+    if _, err := io.WriteString(hasher, "Derivation:"); err != nil {
+        return nil, err
+    }
+    if _, err := io.WriteString(hasher, drv.name); err != nil {
+        return nil, err
+    }
+    if err := binary.Write(hasher, binary.LittleEndian, uint64(len(drv.outputs))); err != nil {
+        return nil, err
+    }
+    for _, i := range drv.outputs {
+        if _, err := io.WriteString(hasher, i); err != nil {
+            return nil, err
+        }
+    }
+    if err := binary.Write(hasher, binary.LittleEndian, uint64(drv.outputMode)); err != nil {
+        return nil, err
+    }
+    if drv.outputMode == OutputFixed {
+        if _, err := hasher.Write(drv.fixedHashSha256); err != nil {
+            return nil, err
+        }
+    }
+    if drv.buildInfo != nil {
+        if _, err := io.WriteString(hasher, drv.buildInfo.buildPlatform); err != nil {
+            return nil, err
+        }
+        if _, err := io.WriteString(hasher, drv.buildInfo.builder); err != nil {
+            return nil, err
+        }
+        if err := binary.Write(hasher, binary.LittleEndian, uint64(len(drv.buildInfo.args))); err != nil {
+            return nil, err
+        }
+        for _, i := range drv.buildInfo.args {
+            if _, err := io.WriteString(hasher, i); err != nil {
+                return nil, err
+            }
+        }
+        if err := binary.Write(hasher, binary.LittleEndian, uint64(len(drv.buildInfo.buildInputs))); err != nil {
+            return nil, err
+        }
+        buildInputsHashes := [][]byte{}
+        for _, i := range drv.buildInfo.buildInputs {
+            hash, err := i.Hash()
+            if err != nil {
+                return nil, err
+            }
+            buildInputsHashes = append(buildInputsHashes, hash)
+        }
+        sort.Slice(buildInputsHashes, func(i int, j int) bool {
+            return bytes.Compare(buildInputsHashes[i], buildInputsHashes[j]) < 0
+        })
+        for _, i := range buildInputsHashes {
+            if _, err := hasher.Write(i); err != nil {
+                return nil, err
+            }
+        }
+        if err := binary.Write(hasher, binary.LittleEndian, uint64(len(drv.buildInfo.runtimeInputs))); err != nil {
+            return nil, err
+        }
+        runtimeInputsHashes := [][]byte{}
+        for _, i := range drv.buildInfo.runtimeInputs {
+            hash, err := i.Hash()
+            if err != nil {
+                return nil, err
+            }
+            runtimeInputsHashes = append(runtimeInputsHashes, hash)
+        }
+        sort.Slice(runtimeInputsHashes, func(i int, j int) bool {
+            return bytes.Compare(runtimeInputsHashes[i], runtimeInputsHashes[j]) < 0
+        })
+        for _, i := range runtimeInputsHashes {
+            if _, err := hasher.Write(i); err != nil {
+                return nil, err
+            }
+        }
+        if err := binary.Write(hasher, binary.LittleEndian, uint64(len(drv.buildInfo.env))); err != nil {
+            return nil, err
+        }
+        for key, value := range drv.buildInfo.env {
+            if _, err := io.WriteString(hasher, key); err != nil {
+                return nil, err
+            }
+            if _, err := io.WriteString(hasher, value); err != nil {
+                return nil, err
+            }
+        }
+        if err := binary.Write(hasher, binary.LittleEndian, uint64(len(drv.buildInfo.buildFiles))); err != nil {
+            return nil, err
+        }
+        for key, value := range drv.buildInfo.buildFiles {
+            if _, err := io.WriteString(hasher, key); err != nil {
+                return nil, err
+            }
+            if _, err := io.WriteString(hasher, value); err != nil {
+                return nil, err
+            }
+        }
+    }
+
+    hash := hasher.Sum(nil)
+    drv.hashCachedSha256 = hash
+    return hash, nil
+}
+
+func (drv *Derivation) OutputPlaceholderHash(outputName string) (string, error) {
+    var output string
+    hash, err := drv.Hash()
+    if err != nil {
+        return output, err
+    }
+    hasher := sha256.New()
+    if _, err := io.WriteString(hasher, "DerivationOutput:"); err != nil {
+        return output, err
+    }
+    if _, err := io.WriteString(hasher, outputName); err != nil {
+        return output, err
+    }
+    if _, err := hasher.Write(hash); err != nil {
+        return output, err
+    }
+    outputHash := hasher.Sum(nil)
+    output = hex.EncodeToString(outputHash)
+    return output, nil
+}
+
+func SelfOutputPlaceholderHash(outputName string) (string, error) {
+    hasher := sha256.New()
+    var output string
+    if _, err := io.WriteString(hasher, "SelfDerivationOutput:"); err != nil {
+        return output, err
+    }
+    if _, err := io.WriteString(hasher, outputName); err != nil {
+        return output, err
+    }
+    selfOutputHash := hasher.Sum(nil)
+    output = hex.EncodeToString(selfOutputHash)
+    return output, nil
+}
 
 func main() {
     st, err := store.New("./meowstore/")
@@ -180,10 +359,19 @@ func main() {
                     return nil, err
                 }
 
+                preparedDerivation := Derivation{
+                    name: name,
+                    outputs: []string{"default"},
+                    outputMode: OutputFixed,
+                    fixedHashSha256: []byte{},
+                    buildInfo: nil,
+                }
+
                 // check if what we expect is already in the store
-                storePath, err := st.GetPath(name, "default", ExpectedHashBytes)
+                _, err = st.GetPath(name, "default", ExpectedHashBytes)
                 if err == nil {
-                    return storePath, nil
+                    preparedDerivation.fixedHashSha256 = ExpectedHashBytes
+                    return &preparedDerivation, nil
                 }
 
                 // HTTP request
@@ -241,7 +429,6 @@ func main() {
                 // hash
                 storeHash, err := store.Hash(tmpPath)
                 if err != nil {
-                    fmt.Println(tmpPath)
                     return nil, err
                 }
                 storeHashBytes := storeHash.Sum(nil)
@@ -252,7 +439,331 @@ func main() {
                     return nil, fmt.Errorf("fetchhttp expected hash %s got: %s", hash, hashGot)
                 }
 
-                return st.CopyToStore(tmpPath, name, "default", storeHashBytes)
+                _, err = st.CopyToStore(tmpPath, name, "default", storeHashBytes)
+                if err != nil {
+                    return nil, err
+                }
+
+                preparedDerivation.fixedHashSha256 = storeHashBytes
+                return &preparedDerivation, nil
+            })),
+            "derivation": interpreter.NewThunkEvaluated(interpreter.NewFnDefExternal(func(ip *interpreter.Interpreter, argT *interpreter.Thunk) (any, error) {
+                arg, err := ip.Force(argT)
+                if err != nil {
+                    return nil, err
+                }
+                argAttrs, isAttrs := arg.(map[string]*interpreter.Thunk)
+                if !isAttrs {
+                    return nil, fmt.Errorf("derivation called with unknown arg of type %T: %v", arg, arg)
+                }
+
+                // get name arg
+                nameT := argAttrs["name"]
+                if nameT == nil {
+                    return nil, fmt.Errorf("derivation called with missing argument name")
+                }
+                nameF, err := ip.Force(nameT)
+                if err != nil {
+                    return nil, err
+                }
+                name, isString := nameF.(string)
+                if !isString {
+                    return nil, fmt.Errorf("derivation called with invalid type for name arg %T: %v", nameF, nameF)
+                }
+
+                // get buildPlatform arg
+                buildPlatformT := argAttrs["buildPlatform"]
+                if buildPlatformT == nil {
+                    return nil, fmt.Errorf("derivation called with missing argument buildPlatform")
+                }
+                buildPlatformF, err := ip.Force(buildPlatformT)
+                if err != nil {
+                    return nil, err
+                }
+                buildPlatform, isString := buildPlatformF.(string)
+                if !isString {
+                    return nil, fmt.Errorf("derivation called with invalid type for buildPlatform arg %T: %v", buildPlatformF, buildPlatformF)
+                }
+
+                // get builder arg
+                builderT := argAttrs["builder"]
+                if builderT == nil {
+                    return nil, fmt.Errorf("derivation called with missing argument builder")
+                }
+                builderF, err := ip.Force(builderT)
+                if err != nil {
+                    return nil, err
+                }
+                builder, isString := builderF.(string)
+                if !isString {
+                    return nil, fmt.Errorf("derivation called with invalid type for builder arg %T: %v", builderF, builderF)
+                }
+
+                // get args arg
+                args := []string{}
+                argsT := argAttrs["args"]
+                if argsT != nil {
+                    argsF, err := ip.Force(argsT)
+                    if err != nil {
+                        return nil, err
+                    }
+                    argsL, isThunkList := argsF.([]*interpreter.Thunk)
+                    if !isThunkList {
+                        return nil, fmt.Errorf("derivation called with invalid type for args arg %T: %v", argsF, argsF)
+                    }
+                    for _, iT := range argsL {
+                        iF, err := ip.Force(iT)
+                        if err != nil {
+                            return nil, err
+                        }
+                        iS, isString := iF.(string)
+                        if !isString {
+                            return nil, fmt.Errorf("derivation called with invalid type for args element %T: %v", iF, iF)
+                        }
+                        args = append(args, iS)
+                    }
+                }
+
+                // get buildInputs arg
+                buildInputs := []*Derivation{}
+                buildInputsT := argAttrs["buildInputs"]
+                if buildInputsT != nil {
+                    buildInputsF, err := ip.Force(buildInputsT)
+                    if err != nil {
+                        return nil, err
+                    }
+                    buildInputsL, isThunkList := buildInputsF.([]*interpreter.Thunk)
+                    if !isThunkList {
+                        return nil, fmt.Errorf("derivation called with invalid type for buildInputs arg %T: %v", buildInputsF, buildInputsF)
+                    }
+                    for _, iT := range buildInputsL {
+                        iF, err := ip.Force(iT)
+                        if err != nil {
+                            return nil, err
+                        }
+                        iS, isDerivation := iF.(*Derivation)
+                        if !isDerivation {
+                            return nil, fmt.Errorf("derivation called with invalid type for buildInputs element %T: %v", iF, iF)
+                        }
+                        buildInputs = append(buildInputs, iS)
+                    }
+                }
+
+                // get runtimeInputs arg
+                runtimeInputs := []*Derivation{}
+                runtimeInputsT := argAttrs["runtimeInputs"]
+                if runtimeInputsT != nil {
+                    runtimeInputsF, err := ip.Force(runtimeInputsT)
+                    if err != nil {
+                        return nil, err
+                    }
+                    runtimeInputsL, isThunkList := runtimeInputsF.([]*interpreter.Thunk)
+                    if !isThunkList {
+                        return nil, fmt.Errorf("derivation called with invalid type for runtimeInputs arg %T: %v", runtimeInputsF, runtimeInputsF)
+                    }
+                    for _, iT := range runtimeInputsL {
+                        iF, err := ip.Force(iT)
+                        if err != nil {
+                            return nil, err
+                        }
+                        iS, isDerivation := iF.(*Derivation)
+                        if !isDerivation {
+                            return nil, fmt.Errorf("derivation called with invalid type for runtimeInputs element %T: %v", iF, iF)
+                        }
+                        runtimeInputs = append(runtimeInputs, iS)
+                    }
+                }
+
+                // get outputs arg
+                outputs := []string{}
+                outputsT := argAttrs["outputs"]
+                if outputsT != nil {
+                    outputsF, err := ip.Force(outputsT)
+                    if err != nil {
+                        return nil, err
+                    }
+                    outputsL, isThunkList := outputsF.([]*interpreter.Thunk)
+                    if !isThunkList {
+                        return nil, fmt.Errorf("derivation called with invalid type for outputs arg %T: %v", outputsF, outputsF)
+                    }
+                    for _, iT := range outputsL {
+                        iF, err := ip.Force(iT)
+                        if err != nil {
+                            return nil, err
+                        }
+                        iS, isString := iF.(string)
+                        if !isString {
+                            return nil, fmt.Errorf("derivation called with invalid type for outputs element %T: %v", iF, iF)
+                        }
+                        outputs = append(outputs, iS)
+                    }
+                } else {
+                    outputs = append(outputs, "default")
+                }
+
+                // get env arg
+                env := make(map[string]string)
+                envT := argAttrs["env"]
+                if envT != nil {
+                    envF, err := ip.Force(envT)
+                    if err != nil {
+                        return nil, err
+                    }
+                    envA, isThunkAttrs := envF.(map[string]*interpreter.Thunk)
+                    if !isThunkAttrs {
+                        return nil, fmt.Errorf("derivation called with invalid type for env arg %T: %v", envF, envF)
+                    }
+                    for key, iT := range envA {
+                        iF, err := ip.Force(iT)
+                        if err != nil {
+                            return nil, err
+                        }
+                        iS, isString := iF.(string)
+                        if !isString {
+                            return nil, fmt.Errorf("derivation called with invalid type for env value %T: %v", iF, iF)
+                        }
+                        env[key] = iS
+                    }
+                }
+
+                // get buildFiles arg
+                buildFiles := make(map[string]string)
+                buildFilesT := argAttrs["buildFiles"]
+                if buildFilesT != nil {
+                    buildFilesF, err := ip.Force(buildFilesT)
+                    if err != nil {
+                        return nil, err
+                    }
+                    buildFilesA, isThunkAttrs := buildFilesF.(map[string]*interpreter.Thunk)
+                    if !isThunkAttrs {
+                        return nil, fmt.Errorf("derivation called with invalid type for buildFiles arg %T: %v", buildFilesF, buildFilesF)
+                    }
+                    for key, iT := range buildFilesA {
+                        iF, err := ip.Force(iT)
+                        if err != nil {
+                            return nil, err
+                        }
+                        iS, isString := iF.(string)
+                        if !isString {
+                            return nil, fmt.Errorf("derivation called with invalid type for buildFiles value %T: %v", iF, iF)
+                        }
+                        buildFiles[key] = iS
+                    }
+                }
+
+                // get outputMode arg
+                outputModeT := argAttrs["outputMode"]
+                if outputModeT == nil {
+                    return nil, fmt.Errorf("derivation called with missing argument outputMode")
+                }
+                outputModeF, err := ip.Force(outputModeT)
+                if err != nil {
+                    return nil, err
+                }
+                outputModeS, isString := outputModeF.(string)
+                if !isString {
+                    return nil, fmt.Errorf("derivation called with invalid type for outputMode arg %T: %v", outputModeF, outputModeF)
+                }
+                var outputMode DerivationOutputMode
+                switch outputModeS {
+                case "ia":
+                    outputMode = OutputInputAddressed
+                case "ca":
+                    outputMode = OutputContentAddressed
+                case "fixed":
+                    outputMode = OutputFixed
+                default:
+                    return nil, fmt.Errorf("derivation: invalid outputMode string %s", outputModeS)
+                }
+
+                var fixedHashSha256 []byte
+                if outputMode == OutputFixed {
+                    // get fixedHash arg
+                    fixedHashT := argAttrs["fixedHash"]
+                    if fixedHashT == nil {
+                        return nil, fmt.Errorf("derivation called with missing argument fixedHash")
+                    }
+                    fixedHashF, err := ip.Force(fixedHashT)
+                    if err != nil {
+                        return nil, err
+                    }
+                    fixedHash, isString := fixedHashF.(string)
+                    if !isString {
+                        return nil, fmt.Errorf("derivation called with invalid type for fixedHash arg %T: %v", fixedHashF, fixedHashF)
+                    }
+                    if !strings.HasPrefix(fixedHash, "sha256-") {
+                        return nil, fmt.Errorf("derivation called with unsupported fixedHash format %s", fixedHash)
+                    }
+                    fixedHashSha256, err = base64.StdEncoding.DecodeString(strings.TrimPrefix(fixedHash, "sha256-"))
+                    if err != nil {
+                        return nil, err
+                    }
+                }
+
+                return &Derivation{
+                    name: name,
+                    outputs: outputs,
+                    outputMode: OutputFixed,
+                    fixedHashSha256: fixedHashSha256,
+                    buildInfo: &DerivationBuildInfo{
+                        buildPlatform: buildPlatform,
+                        builder: builder,
+                        args: args,
+                        buildInputs: buildInputs,
+                        runtimeInputs: runtimeInputs,
+                        env: env,
+                        buildFiles: buildFiles,
+                    },
+                }, nil
+            })),
+            "outPathPlaceholder": interpreter.NewThunkEvaluated(interpreter.NewFnDefExternal(func(ip *interpreter.Interpreter, argT *interpreter.Thunk) (any, error) {
+                argDerivationT := argT
+
+                return interpreter.NewFnDefExternal(func(ip *interpreter.Interpreter, argT *interpreter.Thunk) (any, error) {
+                    argOutputNameT := argT
+
+                    argDerivationF, err := ip.Force(argDerivationT)
+                    if err != nil {
+                        return nil, err
+                    }
+                    derivation, isDerivation := argDerivationF.(*Derivation)
+                    if !isDerivation {
+                        return nil, fmt.Errorf("outPathPlaceholder: called! with unknown arg of type %T: %v", argDerivationF, argDerivationF)
+                    }
+
+                    argOutputNameF, err := ip.Force(argOutputNameT)
+                    if err != nil {
+                        return nil, err
+                    }
+                    outputName, isString := argOutputNameF.(string)
+                    if !isString {
+                        return nil, fmt.Errorf("outPathPlaceholder: called! with unknown arg of type %T: %v", argOutputNameF, argOutputNameF)
+                    }
+
+                    hash, err := derivation.OutputPlaceholderHash(outputName)
+                    if err != nil {
+                        return nil, err
+                    }
+
+                    return hash, nil
+                }), nil
+            })),
+            "selfOutPathPlaceholder": interpreter.NewThunkEvaluated(interpreter.NewFnDefExternal(func(ip *interpreter.Interpreter, argT *interpreter.Thunk) (any, error) {
+                argOutputNameF, err := ip.Force(argT)
+                if err != nil {
+                    return nil, err
+                }
+                outputName, isString := argOutputNameF.(string)
+                if !isString {
+                    return nil, fmt.Errorf("selfOutPathPlaceholder: called! with unknown arg of type %T: %v", argOutputNameF, argOutputNameF)
+                }
+
+                hash, err := SelfOutputPlaceholderHash(outputName)
+                if err != nil {
+                    return nil, err
+                }
+
+                return hash, nil
             })),
         }),
     }

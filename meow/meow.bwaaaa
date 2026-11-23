@@ -1,4 +1,4 @@
 let
     bootstrap = builtins.import "meow/pkgs/bootstrap-x86.bwaaaa" {};
 in
-builtins.throw (bootstrap.hex0_seed + " " + bootstrap.stage0_posix)
+builtins.throw ((builtins.outPathPlaceholder bootstrap.hex0_seed "default") + " " + (builtins.outPathPlaceholder bootstrap.stage0_posix "default") + " " + (builtins.outPathPlaceholder bootstrap.hex0 "default"))
