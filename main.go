@@ -337,7 +337,7 @@ func main() {
                 }
 
                 // get buildInputs arg
-                buildInputs := []*derivation.Derivation{}
+                buildInputs := []*derivation.DerivationDependency{}
                 buildInputsT := argAttrs["buildInputs"]
                 if buildInputsT != nil {
                     buildInputsF, err := ip.Force(buildInputsT)
@@ -353,16 +353,16 @@ func main() {
                         if err != nil {
                             return nil, err
                         }
-                        iS, isDerivation := iF.(*derivation.Derivation)
+                        iD, isDerivation := iF.(*derivation.Derivation)
                         if !isDerivation {
                             return nil, fmt.Errorf("derivation called with invalid type for buildInputs element %T: %v", iF, iF)
                         }
-                        buildInputs = append(buildInputs, iS)
+                        buildInputs = append(buildInputs, derivation.NewDependency(iD, "default"))
                     }
                 }
 
                 // get runtimeInputs arg
-                runtimeInputs := []*derivation.Derivation{}
+                runtimeInputs := []*derivation.DerivationDependency{}
                 runtimeInputsT := argAttrs["runtimeInputs"]
                 if runtimeInputsT != nil {
                     runtimeInputsF, err := ip.Force(runtimeInputsT)
@@ -378,11 +378,11 @@ func main() {
                         if err != nil {
                             return nil, err
                         }
-                        iS, isDerivation := iF.(*derivation.Derivation)
+                        iD, isDerivation := iF.(*derivation.Derivation)
                         if !isDerivation {
                             return nil, fmt.Errorf("derivation called with invalid type for runtimeInputs element %T: %v", iF, iF)
                         }
-                        runtimeInputs = append(runtimeInputs, iS)
+                        runtimeInputs = append(runtimeInputs, derivation.NewDependency(iD, "default"))
                     }
                 }
 

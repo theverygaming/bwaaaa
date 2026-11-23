@@ -21,9 +21,24 @@ type Derivation struct {
     outputs []string
     outputMode DerivationOutputMode
     fixedHashSha256 []byte // for outputMode=OutputFixed specifically
-	runtimeInputs []*Derivation // build-time and runtime inputs
+	runtimeInputs []*DerivationDependency // build-time and runtime inputs
     buildInfo *DerivationBuildInfo // optional. Sometimes derivations may have no build information attached to them.
     hashCachedSha256 []byte // cached hash
+}
+
+type DerivationDependency struct {
+	derivation *Derivation
+	outputName string
+	hashCachedSha256 []byte // cached hash
+}
+
+func NewDependency(drv *Derivation, outputName string) *DerivationDependency {
+	// FIXME: verify the outputName exists
+	return &DerivationDependency{
+		derivation: drv,
+		outputName: outputName,
+		hashCachedSha256: nil,
+	}
 }
 
 func New(
@@ -31,7 +46,7 @@ func New(
 	outputs []string,
 	outputMode DerivationOutputMode,
 	fixedHashSha256 []byte, // nil for non-fixed derivation
-	runtimeInputs []*Derivation, // build-time and runtime inputs
+	runtimeInputs []*DerivationDependency, // build-time and runtime inputs
 ) (*Derivation, error) {
 	if outputMode != OutputFixed && fixedHashSha256 != nil {
 		return nil, errors.New("a non-fixed output derivation may not have a fixed hash")
@@ -55,7 +70,7 @@ type DerivationBuildInfo struct {
     buildPlatform string // platform the build is executed on
     builder string // builder executable path
     args []string // builder args
-    buildInputs []*Derivation // build-time only inputs
+    buildInputs []*DerivationDependency // build-time only inputs
     env map[string]string
     buildFiles map[string]string // content will be copied into build env as files and pointed to by env vars F_<caps_name>
 }
@@ -64,7 +79,7 @@ func (drv *Derivation) AddBuildInfo(
 	platform string, // platform the build is executed on
 	builder string, // builder executable path
 	args []string, // builder args
-	buildInputs []*Derivation, // build-time only inputs
+	buildInputs []*DerivationDependency, // build-time only inputs
 	env map[string]string,
 	buildFiles map[string]string, // content will be copied into build env as files and pointed to by env vars F_<caps_name>
 ) error {
@@ -193,6 +208,32 @@ func (drv *Derivation) Hash() ([]byte, error) {
 
     hash := hasher.Sum(nil)
     drv.hashCachedSha256 = hash
+    return hash, nil
+}
+
+
+func (dep *DerivationDependency) Hash() ([]byte, error) {
+    if len(dep.hashCachedSha256) == 32 {
+        return dep.hashCachedSha256, nil
+    }
+
+    hasher := sha256.New()
+    if _, err := io.WriteString(hasher, "DerivationDependency:"); err != nil {
+        return nil, err
+    }
+    if _, err := io.WriteString(hasher, dep.outputName); err != nil {
+        return nil, err
+    }
+	drvHash, err := dep.derivation.Hash()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := hasher.Write(drvHash); err != nil {
+		return nil, err
+	}
+
+    hash := hasher.Sum(nil)
+    dep.hashCachedSha256 = hash
     return hash, nil
 }
 
