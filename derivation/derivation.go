@@ -20,12 +20,10 @@ type Derivation struct {
     name string
     outputs []string
     outputMode DerivationOutputMode
-    // for outputMode=OutputFixed specifically
-    fixedHashSha256 []byte
-    // optional. Sometimes derivations may have no build information attached to them.
-    buildInfo *DerivationBuildInfo
-    // cached hash
-    hashCachedSha256 []byte
+    fixedHashSha256 []byte // for outputMode=OutputFixed specifically
+	runtimeInputs []*Derivation // build-time and runtime inputs
+    buildInfo *DerivationBuildInfo // optional. Sometimes derivations may have no build information attached to them.
+    hashCachedSha256 []byte // cached hash
 }
 
 func New(
@@ -33,17 +31,20 @@ func New(
 	outputs []string,
 	outputMode DerivationOutputMode,
 	fixedHashSha256 []byte, // nil for non-fixed derivation
+	runtimeInputs []*Derivation, // build-time and runtime inputs
 ) (*Derivation, error) {
 	if outputMode != OutputFixed && fixedHashSha256 != nil {
 		return nil, errors.New("a non-fixed output derivation may not have a fixed hash")
 	} else if outputMode == OutputFixed && len(fixedHashSha256) != 32 {
 		return nil, errors.New("fixed output derivation: missing or invalid hash")
 	}
+	// FIXME: deduplicate runtimeInputs (by hash)
 	drv := &Derivation{
 		name: name,
 		outputs: outputs,
 		outputMode: outputMode,
 		fixedHashSha256: fixedHashSha256,
+		runtimeInputs: runtimeInputs,
 		buildInfo: nil,
 		hashCachedSha256: nil,
 	}
@@ -55,7 +56,6 @@ type DerivationBuildInfo struct {
     builder string // builder executable path
     args []string // builder args
     buildInputs []*Derivation // build-time only inputs
-    runtimeInputs []*Derivation // build-time and runtime inputs
     env map[string]string
     buildFiles map[string]string // content will be copied into build env as files and pointed to by env vars F_<caps_name>
 }
@@ -65,7 +65,6 @@ func (drv *Derivation) AddBuildInfo(
 	builder string, // builder executable path
 	args []string, // builder args
 	buildInputs []*Derivation, // build-time only inputs
-	runtimeInputs []*Derivation, // build-time and runtime inputs
 	env map[string]string,
 	buildFiles map[string]string, // content will be copied into build env as files and pointed to by env vars F_<caps_name>
 ) error {
@@ -75,14 +74,13 @@ func (drv *Derivation) AddBuildInfo(
 	if drv.buildInfo != nil {
 		return errors.New("AddBuildInfo called but derivation already has buildInfo")
 	}
-	// FIXME: deduplicate buildInputs and runtimeInputs (by hash)
+	// FIXME: deduplicate buildInputs (by hash)
 	// FIXME: ensure that fixed output derivations can only have a single output named "default"
 	drv.buildInfo = &DerivationBuildInfo{
 		buildPlatform: platform,
 		builder: builder,
 		args: args,
 		buildInputs: buildInputs,
-		runtimeInputs: runtimeInputs,
 		env: env,
 		buildFiles: buildFiles,
 	}
@@ -116,6 +114,25 @@ func (drv *Derivation) Hash() ([]byte, error) {
             return nil, err
         }
     }
+	if err := binary.Write(hasher, binary.LittleEndian, uint64(len(drv.runtimeInputs))); err != nil {
+		return nil, err
+	}
+	runtimeInputsHashes := [][]byte{}
+	for _, i := range drv.runtimeInputs {
+		hash, err := i.Hash()
+		if err != nil {
+			return nil, err
+		}
+		runtimeInputsHashes = append(runtimeInputsHashes, hash)
+	}
+	sort.Slice(runtimeInputsHashes, func(i int, j int) bool {
+		return bytes.Compare(runtimeInputsHashes[i], runtimeInputsHashes[j]) < 0
+	})
+	for _, i := range runtimeInputsHashes {
+		if _, err := hasher.Write(i); err != nil {
+			return nil, err
+		}
+	}
     if drv.buildInfo != nil {
         if _, err := io.WriteString(hasher, drv.buildInfo.buildPlatform); err != nil {
             return nil, err
@@ -146,25 +163,6 @@ func (drv *Derivation) Hash() ([]byte, error) {
             return bytes.Compare(buildInputsHashes[i], buildInputsHashes[j]) < 0
         })
         for _, i := range buildInputsHashes {
-            if _, err := hasher.Write(i); err != nil {
-                return nil, err
-            }
-        }
-        if err := binary.Write(hasher, binary.LittleEndian, uint64(len(drv.buildInfo.runtimeInputs))); err != nil {
-            return nil, err
-        }
-        runtimeInputsHashes := [][]byte{}
-        for _, i := range drv.buildInfo.runtimeInputs {
-            hash, err := i.Hash()
-            if err != nil {
-                return nil, err
-            }
-            runtimeInputsHashes = append(runtimeInputsHashes, hash)
-        }
-        sort.Slice(runtimeInputsHashes, func(i int, j int) bool {
-            return bytes.Compare(runtimeInputsHashes[i], runtimeInputsHashes[j]) < 0
-        })
-        for _, i := range runtimeInputsHashes {
             if _, err := hasher.Write(i); err != nil {
                 return nil, err
             }

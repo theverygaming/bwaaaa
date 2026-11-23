@@ -184,7 +184,7 @@ func main() {
                 // check if what we expect is already in the store
                 _, err = st.GetPath(name, "default", ExpectedHashBytes)
                 if err == nil {
-                    return derivation.New(name, []string{"default"}, derivation.OutputFixed, ExpectedHashBytes)
+                    return derivation.New(name, []string{"default"}, derivation.OutputFixed, ExpectedHashBytes, nil)
                 }
 
                 // HTTP request
@@ -257,7 +257,7 @@ func main() {
                     return nil, err
                 }
 
-                return derivation.New(name, []string{"default"}, derivation.OutputFixed, storeHashBytes)
+                return derivation.New(name, []string{"default"}, derivation.OutputFixed, storeHashBytes, nil)
             })),
             "derivation": interpreter.NewThunkEvaluated(interpreter.NewFnDefExternal(func(ip *interpreter.Interpreter, argT *interpreter.Thunk) (any, error) {
                 arg, err := ip.Force(argT)
@@ -512,11 +512,11 @@ func main() {
                     }
                 }
 
-                drv, err := derivation.New(name, outputs, outputMode, fixedHashSha256)
+                drv, err := derivation.New(name, outputs, outputMode, fixedHashSha256, runtimeInputs)
                 if err != nil {
                     return nil, err
                 }
-                err = drv.AddBuildInfo(buildPlatform, builder, args, buildInputs, runtimeInputs, env, buildFiles)
+                err = drv.AddBuildInfo(buildPlatform, builder, args, buildInputs, env, buildFiles)
                 if err != nil {
                     return nil, err
                 }
