@@ -252,27 +252,3 @@ func (st *Store) computeName(name string, outputName string, sha256sum []byte) (
 	// same alphabet as nix https://nix.dev/manual/nix/2.35/protocols/nix32.html
 	return base32.NewEncoding("0123456789abcdfghijklmnpqrsvwxyz").WithPadding(base32.NoPadding).EncodeToString(sha256sum) + "-" + name + suffix, nil
 }
-
-func (st *Store) check() error {
-	_, err := os.Stat(st.basePath)
-	if err != nil {
-		return err
-	}
-	_, err = os.Stat(path.Join(st.basePath, "store"))
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func storeInit(basePath string) error {
-	// main dir
-	if err := os.MkdirAll(basePath, 0755 /* rwxr-xr-x */); err != nil {
-		return err
-	}
-	// /store
-	if err := os.Mkdir(path.Join(basePath, "store"), 0755 /* rwxr-xr-x */); err != nil {
-		return err
-	}
-	return nil
-}
